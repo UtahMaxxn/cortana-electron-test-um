@@ -1,6 +1,6 @@
 {
   "name": "cortana-electron",
-  "version": "1.5.2",
+  "version": "1.6.0",
   "description": "A custom local Cortana client built with Electron.",
   "main": "main.js",
   "author": "BlueySoft",
