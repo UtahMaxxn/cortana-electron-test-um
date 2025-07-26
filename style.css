@@ -29,14 +29,23 @@ html, body {
 }
 #close-btn {
     position: absolute;
-    top: 5px;
-    right: 12px;
+    top: 0;
+    right: 0;
+    width: 45px;
+    height: 45px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-size: 28px;
-    color: #999;
+    color: #a2a2a2;
+    background-color: transparent;
     cursor: pointer;
     z-index: 10;
 }
-#close-btn:hover { color: white; }
+#close-btn:hover {
+    background-color: #3e3e3e;
+    color: #ffffff;
+}
 .content-pane {
     position: absolute;
     top: 0;
