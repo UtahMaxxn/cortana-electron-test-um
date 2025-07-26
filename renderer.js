@@ -8,7 +8,7 @@ let bingLinkContainer, bingLink;
 let appContainer;
 let finishSpeakingTimeout = null;
 
-let reminderContainer, reminderTextInput, reminderTimeInput, reminderSaveBtn, reminderCancelBtn;
+let reminderContainer, reminderTextInput, reminderTimeInput, reminderSaveBtn, reminderCancelBtn, reminderIcon;
 
 const isPackaged = __dirname.includes('app.asar');
 const appRoot = isPackaged ? path.join(__dirname, '..', 'assets') : path.join(__dirname, 'assets');
@@ -49,11 +49,13 @@ window.addEventListener('DOMContentLoaded', () => {
     bingLink = document.getElementById('bing-link');
     
     reminderContainer = document.getElementById('reminder-container');
+    reminderIcon = document.getElementById('reminder-icon');
     reminderTextInput = document.getElementById('reminder-text-input');
     reminderTimeInput = document.getElementById('reminder-time-input');
     reminderSaveBtn = document.getElementById('reminder-save-btn');
     reminderCancelBtn = document.getElementById('reminder-cancel-btn');
 
+    reminderIcon.src = idleGif;
 
     document.getElementById('close-btn').addEventListener('click', () => ipcRenderer.send('close-app'));
     searchBar.addEventListener('keydown', (event) => { if (event.key === 'Enter') onSearch(); });
@@ -411,7 +413,10 @@ function onSearch() {
                 reminderText = reminderWithTimeMatch[1].trim();
                 timeText = reminderWithTimeMatch[2].trim();
             } else if (reminderWithoutTimeMatch) {
-                reminderText = reminderWithoutTimeMatch[1].trim();
+                const capturedText = reminderWithoutTimeMatch[1];
+                if (capturedText) {
+                    reminderText = capturedText.trim();
+                }
             }
             showReminderUI(reminderText, timeText);
             return;
