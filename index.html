@@ -20,24 +20,20 @@
                         </div>
                     </div>
                 </div>
-
                 <div id="reminder-container">
                     <img id="reminder-icon" alt="Cortana Icon">
                     <p class="reminder-title">What do you want to be reminded about?</p>
-                    
                     <div class="reminder-form">
-                        <label class="reminder-label-gray">Reminder</label>
-                        <input type="text" id="reminder-text-input" placeholder="Remember to...">
-                        
-                        <input type="text" id="reminder-time-input" placeholder="Time (e.g., 5 minutes)">
-
+                        <label for="reminder-text-input" class="reminder-label-gray">Remind me to...</label>
+                        <input type="text" id="reminder-text-input" placeholder="e.g., take out the trash">
+                        <label for="reminder-time-input" class="reminder-label-gray">On this date and time</label>
+                        <input type="datetime-local" id="reminder-time-input">
                         <div class="reminder-actions">
                             <button id="reminder-save-btn">Save</button>
                             <button id="reminder-cancel-btn">Cancel</button>
                         </div>
                     </div>
                 </div>
-
             </div>
             <div id="webview-container" class="content-pane">
                 <webview id="webview-frame" style="width:100%; height:100%;"></webview>

@@ -13,6 +13,15 @@ let isWebViewVisible = false;
 let tray = null;
 let isClosing = false;
 
+let reminders = [];
+
+const isSilentStart = process.argv.includes('--hidden');
+
+app.setLoginItemSettings({
+  openAtLogin: true,
+  args: ['--hidden']
+});
+
 const gotTheLock = app.requestSingleInstanceLock();
 
 if (!gotTheLock) {
@@ -34,7 +43,6 @@ function showWindow() {
       const { x, height: screenHeight } = display.workArea;
       mainWindow.setPosition(x, screenHeight - winHeight);
     }
-    
     isClosing = false;
     mainWindow.show();
     mainWindow.focus();
@@ -77,7 +85,7 @@ function createWindow() {
     resizable: false,
     alwaysOnTop: true,
     focusable: true,
-    show: false,
+    show: !isSilentStart,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -89,7 +97,7 @@ function createWindow() {
     ? path.join(process.resourcesPath, 'assets')
     : path.join(__dirname, 'assets');
   const iconPath = path.join(assetsPath, 'icon.ico');
-  
+
   tray = new Tray(iconPath);
   const contextMenu = Menu.buildFromTemplate([
     { label: 'Show Cortana', click: showWindow },
@@ -129,12 +137,12 @@ function createWindow() {
       closeApp();
     }
   });
-  
+
   ipcMain.on('hide-window', () => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.hide();
-      }
-      isClosing = false;
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.hide();
+    }
+    isClosing = false;
   });
 
   ipcMain.on('close-app', closeApp);
@@ -148,8 +156,8 @@ function createWindow() {
     const allApps = new Map();
 
     const startMenuFolders = [
-        path.join('C:', 'ProgramData', 'Microsoft', 'Windows', 'Start Menu', 'Programs'),
-        app.getPath('appData') ? path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs') : null
+      path.join('C:', 'ProgramData', 'Microsoft', 'Windows', 'Start Menu', 'Programs'),
+      app.getPath('appData') ? path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs') : null
     ].filter(Boolean);
 
     for (const folder of startMenuFolders) {
@@ -186,17 +194,68 @@ function createWindow() {
     });
   });
 
-  ipcMain.on('set-reminder', (event, { reminder, time, unit }) => {
-    const timeInMs = unit.startsWith('minute') ? time * 60000 : time * 1000;
-    setTimeout(() => {
-      if (Notification.isSupported()) {
-        new Notification({
-          title: 'Reminder',
-          body: reminder,
-          icon: iconPath
-        }).show();
+  const scheduleReminder = (reminderData) => {
+    const timeInMs = new Date(reminderData.time).getTime() - Date.now();
+    if (timeInMs > 0) {
+      const timeout = setTimeout(() => {
+        if (Notification.isSupported()) {
+          new Notification({
+            title: 'Reminder',
+            body: reminderData.text,
+            icon: iconPath
+          }).show();
+        }
+        reminders = reminders.filter(r => r.id !== reminderData.id);
+      }, timeInMs);
+      return timeout;
+    }
+    return null;
+  };
+
+  ipcMain.on('set-reminder', (event, { reminder, reminderTime }) => {
+    const newReminder = {
+      id: Date.now().toString(),
+      text: reminder,
+      time: reminderTime,
+      timeout: null
+    };
+    newReminder.timeout = scheduleReminder(newReminder);
+    if (newReminder.timeout) {
+      reminders.push(newReminder);
+    }
+  });
+
+  ipcMain.on('update-reminder', (event, { id, reminder, reminderTime }) => {
+    const reminderIndex = reminders.findIndex(r => r.id === id);
+    if (reminderIndex !== -1) {
+      const existingReminder = reminders[reminderIndex];
+      clearTimeout(existingReminder.timeout);
+
+      const updatedReminder = {
+        ...existingReminder,
+        text: reminder,
+        time: reminderTime
+      };
+
+      updatedReminder.timeout = scheduleReminder(updatedReminder);
+      if (updatedReminder.timeout) {
+        reminders[reminderIndex] = updatedReminder;
+      } else {
+        reminders.splice(reminderIndex, 1);
       }
-    }, timeInMs);
+    }
+  });
+
+  ipcMain.on('remove-reminder', (event, id) => {
+    const reminderIndex = reminders.findIndex(r => r.id === id);
+    if (reminderIndex !== -1) {
+      clearTimeout(reminders[reminderIndex].timeout);
+      reminders.splice(reminderIndex, 1);
+    }
+  });
+
+  ipcMain.handle('get-reminders', () => {
+    return reminders.map(({ id, text, time }) => ({ id, text, time }));
   });
 
   ipcMain.handle('get-app-version', () => {
@@ -209,7 +268,9 @@ function createWindow() {
 
   mainWindow.loadFile('index.html');
   mainWindow.on('ready-to-show', () => {
-    showWindow();
+    if (!isSilentStart) {
+      showWindow();
+    }
   });
 }
 

@@ -7,6 +7,7 @@ let webviewContainer, webviewFrame;
 let bingLinkContainer, bingLink;
 let appContainer;
 let finishSpeakingTimeout = null;
+let editingReminderId = null;
 
 let reminderContainer, reminderTextInput, reminderTimeInput, reminderSaveBtn, reminderCancelBtn, reminderIcon;
 
@@ -50,7 +51,7 @@ window.addEventListener('DOMContentLoaded', () => {
     webviewFrame = document.getElementById('webview-frame');
     bingLinkContainer = document.getElementById('bing-link-container');
     bingLink = document.getElementById('bing-link');
-    
+
     reminderContainer = document.getElementById('reminder-container');
     reminderIcon = document.getElementById('reminder-icon');
     reminderTextInput = document.getElementById('reminder-text-input');
@@ -100,7 +101,7 @@ window.addEventListener('DOMContentLoaded', () => {
     });
 
     ipcRenderer.on('trigger-enter-animation', () => { appContainer.classList.add('visible'); });
-    
+
     ipcRenderer.on('command-failed', (event, { command }) => {
         if (command === 'open-application') {
             const errorText = `Sorry, I had trouble opening that. Make sure it's installed correctly.`;
@@ -195,15 +196,16 @@ function onActionFinished() {
 
 function setStateIdle() {
     if (animationContainer.className === 'idle' && document.activeElement === searchBar) return;
-    
+
+    editingReminderId = null;
     reminderContainer.classList.remove('visible');
     animationContainer.style.display = 'block';
-    
+
     clearTimeout(finishSpeakingTimeout);
     window.speechSynthesis.cancel();
     requestSound.pause();
     requestSound.currentTime = 0;
-    
+
     isBusy = false;
 
     ipcRenderer.send('set-webview-visibility', false);
@@ -326,10 +328,13 @@ function updateSaveButtonState() {
     reminderSaveBtn.disabled = !(reminderText && timeText);
 }
 
-function showReminderUI(initialText = '', initialTime = '') {
+function showReminderUI(options = {}) {
+    const { initialText = '', initialTime = '', id = null } = options;
+    editingReminderId = id;
+
     animationContainer.style.display = 'none';
     reminderContainer.classList.add('visible');
-    
+
     reminderTextInput.value = initialText;
     reminderTimeInput.value = initialTime;
 
@@ -338,7 +343,7 @@ function showReminderUI(initialText = '', initialTime = '') {
     isBusy = false;
     searchBar.disabled = true;
     searchBar.placeholder = 'Set your reminder...';
-    
+
     if (!initialText) {
         reminderTextInput.focus();
     } else {
@@ -346,20 +351,97 @@ function showReminderUI(initialText = '', initialTime = '') {
     }
 }
 
+function parseDateTime(text) {
+    const now = new Date();
+    let date = new Date(now);
+    text = text.toLowerCase();
+
+    if (text.includes('tonight')) {
+        date.setHours(21, 0, 0, 0);
+    }
+    else if (text.includes('tomorrow')) {
+        date.setDate(now.getDate() + 1);
+    }
+    else {
+        const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        for (let i = 0; i < days.length; i++) {
+            if (text.includes(days[i])) {
+                const dayIndex = i;
+                const currentDay = now.getDay();
+                let dayDiff = dayIndex - currentDay;
+                if (dayDiff <= 0) {
+                    dayDiff += 7;
+                }
+                date.setDate(now.getDate() + dayDiff);
+                break;
+            }
+        }
+    }
+
+    const timeMatch = text.match(/(\d{1,2})(:\d{2})?\s?(am|pm)?/);
+    if (timeMatch) {
+        let [_, hourStr, minuteStr, ampm] = timeMatch;
+        let hour = parseInt(hourStr, 10);
+        let minute = minuteStr ? parseInt(minuteStr.slice(1), 10) : 0;
+
+        if (ampm === 'pm' && hour < 12) {
+            hour += 12;
+        } else if (ampm === 'am' && hour === 12) {
+            hour = 0;
+        }
+
+        date.setHours(hour, minute, 0, 0);
+        if (date < now && !text.includes('tomorrow') && !days.some(d => text.includes(d))) {
+            date.setDate(date.getDate() + 1);
+        }
+    } else if (text.includes('tonight')) {
+    } else {
+        date.setHours(9, 0, 0, 0);
+    }
+
+    const relativeTimeMatch = text.match(/(\d+)\s*(minute|second)s?/);
+    if (relativeTimeMatch) {
+        const timeValue = parseInt(relativeTimeMatch[1]);
+        const unit = relativeTimeMatch[2];
+        if (unit === 'minute') {
+            date = new Date(now.getTime() + timeValue * 60000);
+        } else if (unit === 'second') {
+            date = new Date(now.getTime() + timeValue * 1000);
+        }
+    }
+
+    return date;
+}
+
+function formatDateTimeForInput(date) {
+    const pad = (num) => num.toString().padStart(2, '0');
+    const year = date.getFullYear();
+    const month = pad(date.getMonth() + 1);
+    const day = pad(date.getDate());
+    const hours = pad(date.getHours());
+    const minutes = pad(date.getMinutes());
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
 function onSaveReminder() {
     const reminder = reminderTextInput.value.trim();
-    const timeRaw = reminderTimeInput.value.trim();
-    const timeMatch = timeRaw.match(/(\d+|a|an)\s*(minute|second)s?/i);
+    const timeValue = reminderTimeInput.value;
 
-    if (reminder && timeMatch) {
-        const timeStr = timeMatch[1];
-        const unit = timeMatch[2].replace(/s$/, '');
-        const time = (timeStr.toLowerCase() === 'a' || timeStr.toLowerCase() === 'an') ? 1 : parseInt(timeStr);
-        const unitText = time === 1 ? unit : `${unit}s`;
+    if (reminder && timeValue) {
+        const reminderDate = new Date(timeValue);
+        const reminderPayload = { reminder, reminderTime: reminderDate.toISOString() };
+        let text;
 
-        ipcRenderer.send('set-reminder', { reminder, time, unit: unitText });
-        const text = `Ok, I'll remind you to "${reminder}" in ${time} ${unitText}.`;
-        
+        if (editingReminderId) {
+            ipcRenderer.send('update-reminder', { id: editingReminderId, ...reminderPayload });
+            text = `OK. I've updated your reminder.`;
+        } else {
+            ipcRenderer.send('set-reminder', reminderPayload);
+            const friendlyTime = reminderDate.toLocaleString([], { weekday: 'long', hour: '2-digit', minute: '2-digit' });
+            text = `OK. I'll remind you to "${reminder}" on ${friendlyTime}.`;
+        }
+
+        editingReminderId = null;
         reminderContainer.classList.remove('visible');
         animationContainer.style.display = 'block';
         setStateActive();
@@ -367,10 +449,8 @@ function onSaveReminder() {
 
         displayAndSpeak(text, onActionFinished, {}, false);
     } else {
-        errorSound.play();
-        errorSound.onended = () => {
-            speak("Please make sure the time is valid, for example '2 minutes' or '30 seconds'.");
-        };
+        const errorText = "Please enter both a reminder and a valid time.";
+        displayAndSpeak(errorText, onActionFinished, {}, true);
     }
 }
 
@@ -390,7 +470,7 @@ async function handleOpenApplication(appName) {
     } else {
         let responseText = "I found a few options. Which one did you mean?";
         resultsDisplay.innerHTML = `<p class="fade-in-item" style="margin-bottom: 10px;">${responseText}</p>`;
-        
+
         apps.slice(0, 5).forEach((app, index) => {
             const btn = document.createElement('button');
             btn.textContent = app.name;
@@ -402,10 +482,91 @@ async function handleOpenApplication(appName) {
             };
             resultsDisplay.appendChild(btn);
         });
-        
+
         speak(responseText, onActionFinished);
         showBingLink();
     }
+}
+
+async function showReminders() {
+    const reminders = await ipcRenderer.invoke('get-reminders');
+    resultsDisplay.innerHTML = '';
+
+    let responseText;
+    if (reminders.length === 0) {
+        responseText = "You don't have any reminders set.";
+        const p = document.createElement('p');
+        p.textContent = responseText;
+        p.className = 'fade-in-item';
+        resultsDisplay.appendChild(p);
+    } else {
+        responseText = "Here are your reminders.";
+        const p = document.createElement('p');
+        p.textContent = responseText;
+        p.className = 'fade-in-item reminder-list-title';
+        resultsDisplay.appendChild(p);
+
+        const list = document.createElement('div');
+        list.className = 'reminder-list';
+        resultsDisplay.appendChild(list);
+
+        reminders.sort((a, b) => new Date(a.time) - new Date(b.time));
+
+        reminders.forEach((reminder, index) => {
+            const item = document.createElement('div');
+            item.className = 'reminder-list-item fade-in-item';
+            item.style.animationDelay = `${index * 100}ms`;
+
+            const textContainer = document.createElement('div');
+            textContainer.className = 'reminder-text-container';
+
+            const text = document.createElement('span');
+            text.textContent = reminder.text;
+            text.className = 'reminder-text';
+
+            const time = document.createElement('span');
+            const reminderDate = new Date(reminder.time);
+            time.textContent = reminderDate.toLocaleString([], {
+                month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+            });
+            time.className = 'reminder-time';
+
+            textContainer.appendChild(text);
+            textContainer.appendChild(time);
+
+            const actions = document.createElement('div');
+            actions.className = 'reminder-item-actions';
+
+            const editBtn = document.createElement('button');
+            editBtn.textContent = 'Edit';
+            editBtn.className = 'reminder-action-btn';
+            editBtn.onclick = () => {
+                setStateActive();
+                showReminderUI({
+                    initialText: reminder.text,
+                    initialTime: formatDateTimeForInput(reminderDate),
+                    id: reminder.id
+                });
+            };
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = 'Delete';
+            deleteBtn.className = 'reminder-action-btn delete';
+            deleteBtn.onclick = () => {
+                ipcRenderer.send('remove-reminder', reminder.id);
+                item.style.animation = 'fadeOut 0.3s forwards';
+                setTimeout(() => showReminders(), 300);
+            };
+
+            actions.appendChild(editBtn);
+            actions.appendChild(deleteBtn);
+            item.appendChild(textContainer);
+            item.appendChild(actions);
+            list.appendChild(item);
+        });
+    }
+
+    speak(responseText, onActionFinished);
 }
 
 function onSearch() {
@@ -423,36 +584,44 @@ function onSearch() {
     searchBar.placeholder = 'Thinking...';
     searchBar.disabled = true;
     gifDisplay.src = thinkingGif;
-    
+
     requestSound.play();
 
     requestSound.onended = () => {
         bingLinkContainer.style.display = 'none';
         bingLinkContainer.style.opacity = '0';
 
-        const reminderWithTimeMatch = query.match(/remind me to (.+?) in (.+)/i);
+        const reminderWithTimeMatch = query.match(/remind me to (.+?)( at | on | in )(.+)/i);
         const reminderWithoutTimeMatch = query.match(/remind me to (.+)/i);
         const genericReminderMatch = query.match(/^set a reminder$/i);
         const simplestReminderMatch = query.match(/^remind me$/i);
-        
+        const showRemindersMatch = query.match(/^(my|what are my|what reminders do i have|show my|show) reminders?\??( set)?\??$/i);
+
         const isReminder = reminderWithTimeMatch || reminderWithoutTimeMatch || genericReminderMatch || simplestReminderMatch;
+
+        if (showRemindersMatch) {
+            gifDisplay.src = speakingGif;
+            showReminders();
+            return;
+        }
 
         if (isReminder) {
             let reminderText = '';
             let timeText = '';
             if (reminderWithTimeMatch) {
                 reminderText = reminderWithTimeMatch[1].trim();
-                timeText = reminderWithTimeMatch[2].trim();
+                const parsedDate = parseDateTime(reminderWithTimeMatch[3].trim());
+                timeText = formatDateTimeForInput(parsedDate);
             } else if (reminderWithoutTimeMatch) {
                 const capturedText = reminderWithoutTimeMatch[1];
                 if (capturedText) {
                     reminderText = capturedText.trim();
                 }
             }
-            showReminderUI(reminderText, timeText);
+            showReminderUI({ initialText: reminderText, initialTime: timeText });
             return;
         }
-        
+
         const calculatorMatch = query.match(/^[\d\s\.\+\-\*\/()]+$/);
         const timeQueryMatch = query.match(/time (?:in|for|at) (.+)/i);
         const genericTimeMatch = query.match(/time(\s?now|\s?here)?\??$/i);
@@ -462,8 +631,7 @@ function onSearch() {
         const dateMatch = query.match(/(what's|what is) (the date|today's date|today|the day)\??/i);
         const versionMatch = query.match(/(what('s| is your| version is this| version are you| version am i running| version of cortana are you))|app version/i);
         const openAppMatch = query.match(/open (.+)/i);
-        const burgerDogMatch = query.match(/LeGamer|KernelOS|Leg Hammer|KNS/i);
-        
+
         const statusQueryMatch = query.match(/(what's up|sup|how's it going|how are you)\??/i);
         const thanksMatch = query.match(/^(thanks|thank you|thx|ty)(.+)?(!|\.)?$/i);
         const byeMatch = query.match(/^(bye|goodbye|see ya|later|cya|see you later)(!|\.)?$/i);
@@ -472,10 +640,10 @@ function onSearch() {
         const marryMatch = query.match(/(will you |can you )?marry me\??/i);
         const bodyMatch = query.match(/(how (do i|to)|where to|best way to) (hide|dispose of) a body\??/i);
 
-        const isWebSearch = !calculatorMatch && !timeQueryMatch && !genericTimeMatch && !jokeMatch && !retiledMatch && !weatherMatch && !dateMatch && !versionMatch && !openAppMatch && !burgerDogMatch && !thanksMatch && !byeMatch && !helloMatch && !helpMatch && !marryMatch && !bodyMatch && !statusQueryMatch;
+        const isWebSearch = !calculatorMatch && !timeQueryMatch && !genericTimeMatch && !jokeMatch && !retiledMatch && !weatherMatch && !dateMatch && !versionMatch && !openAppMatch && !thanksMatch && !byeMatch && !helloMatch && !helpMatch && !marryMatch && !bodyMatch && !statusQueryMatch;
 
         gifDisplay.src = speakingGif;
-        
+
         if (isWebSearch) {
             if (navigator.onLine) {
                 performWebSearch(query);
@@ -483,9 +651,6 @@ function onSearch() {
                 const errorText = "Sorry, I can't connect to the internet right now. Please check your connection.";
                 displayAndSpeak(errorText, onActionFinished, {}, true);
             }
-        } else if (burgerDogMatch) {
-            const response = "Burger dog, B-B-Burger dog!";
-            displayAndSpeak(response, onActionFinished, {}, false);
         } else if (statusQueryMatch) {
             const response = "Nothing much. What may I help you with?";
             displayAndSpeak(response, onActionFinished, {}, false);
