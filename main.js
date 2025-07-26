@@ -10,6 +10,7 @@ let mainWindow;
 const winWidth = 360;
 let isWebViewVisible = false;
 let tray = null;
+let isClosing = false;
 
 const gotTheLock = app.requestSingleInstanceLock();
 
@@ -26,6 +27,7 @@ if (!gotTheLock) {
 
 function showWindow() {
   if (mainWindow && !mainWindow.isDestroyed()) {
+    isClosing = false;
     mainWindow.show();
     mainWindow.focus();
     mainWindow.webContents.send('trigger-enter-animation');
@@ -95,12 +97,17 @@ function createWindow() {
   });
 
   const closeApp = () => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('go-idle-and-close');
+    if (isClosing || !mainWindow || mainWindow.isDestroyed() || !mainWindow.isVisible()) {
+      return;
     }
+    isClosing = true;
+    mainWindow.webContents.send('go-idle-and-close');
   };
 
   const handleBlur = () => {
+    if (isWebViewVisible) {
+      return;
+    }
     if (!mainWindow || mainWindow.isDestroyed()) {
       return;
     }
@@ -119,6 +126,7 @@ function createWindow() {
       if (mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.hide();
       }
+      isClosing = false;
   });
 
   ipcMain.on('close-app', closeApp);

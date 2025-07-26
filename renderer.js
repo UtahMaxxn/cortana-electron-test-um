@@ -79,8 +79,7 @@ window.addEventListener('DOMContentLoaded', () => {
     ipcRenderer.on('command-failed', (event, { command }) => {
         if (command === 'open-application') {
             const errorText = `Sorry, I had trouble opening that. Make sure it's installed correctly.`;
-            resultsDisplay.textContent = errorText;
-            speak(errorText, onActionFinished);
+            displayAndSpeak(errorText, onActionFinished);
         }
     });
 
@@ -88,6 +87,21 @@ window.addEventListener('DOMContentLoaded', () => {
     setStateIdle();
     setTimeout(() => { searchBar.focus(); }, 400);
 });
+
+function displayAndSpeak(text, callback, options = {}) {
+    resultsDisplay.innerHTML = '';
+
+    const p = document.createElement('p');
+    p.textContent = text;
+    p.className = 'fade-in-item';
+    resultsDisplay.appendChild(p);
+
+    if (options.showBingLink) {
+        showBingLink();
+    }
+
+    speak(text, callback);
+}
 
 function setupTTS() {
     function findVoice() {
@@ -160,11 +174,12 @@ function setStateIdle() {
     webviewContainer.classList.remove('visible');
     animationContainer.className = 'idle';
     gifDisplay.src = idleGif;
-    resultsDisplay.innerHTML = `<p>What's on your mind?</p>`;
+    resultsDisplay.innerHTML = `<p class="fade-in-item">What's on your mind?</p>`;
     bingLinkContainer.style.display = 'none';
+    bingLinkContainer.style.opacity = '0';
 
     searchBar.disabled = false;
-    searchBar.placeholder = 'Ask me anything...';
+    searchBar.placeholder = 'Type here to search';
 }
 
 function setStateActive() {
@@ -176,11 +191,15 @@ function showWebView(url) {
     ipcRenderer.send('set-webview-visibility', true);
     webviewFrame.src = url;
     webviewContainer.classList.add('visible');
-    speak(`Here's what I found on the web`, onActionFinished);
+    displayAndSpeak(`Here's what I found on the web`, onActionFinished);
 }
 
 function showBingLink() {
     bingLinkContainer.style.display = 'block';
+    setTimeout(() => {
+        bingLinkContainer.style.animation = 'fadeIn 0.5s forwards';
+        bingLinkContainer.style.opacity = '1';
+    }, 200);
 }
 
 function calculate(query) {
@@ -194,9 +213,7 @@ function calculate(query) {
     } catch (error) {
         responseText = `Sorry, that doesn't look like a valid calculation.`;
     }
-    resultsDisplay.textContent = responseText;
-    showBingLink();
-    speak(responseText, onActionFinished);
+    displayAndSpeak(responseText, onActionFinished, { showBingLink: true });
 }
 
 async function getWeather(location) {
@@ -212,9 +229,7 @@ async function getWeather(location) {
     } catch (error) {
         responseText = `Sorry, I couldn't get the weather for ${location}.`;
     }
-    resultsDisplay.textContent = responseText;
-    showBingLink();
-    speak(responseText, onActionFinished);
+    displayAndSpeak(responseText, onActionFinished, { showBingLink: true });
 }
 
 async function getTimeForLocation(rawInput) {
@@ -239,25 +254,19 @@ async function getTimeForLocation(rawInput) {
     } catch (error) {
         text = `Sorry, I couldn't find the time for '${rawInput.trim()}'.`;
     }
-    resultsDisplay.textContent = text;
-    showBingLink();
-    speak(text, onActionFinished);
+    displayAndSpeak(text, onActionFinished, { showBingLink: true });
 }
 
 function getLocalTime() {
     const now = new Date();
     const text = `The local time is ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-    resultsDisplay.textContent = text;
-    showBingLink();
-    speak(text, onActionFinished);
+    displayAndSpeak(text, onActionFinished, { showBingLink: true });
 }
 
 function getDate() {
     const now = new Date();
     const text = `Today's date is ${now.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`;
-    resultsDisplay.textContent = text;
-    showBingLink();
-    speak(text, onActionFinished);
+    displayAndSpeak(text, onActionFinished, { showBingLink: true });
 }
 
 function setReminder(reminder, timeStr, unit) {
@@ -266,41 +275,38 @@ function setReminder(reminder, timeStr, unit) {
 
     ipcRenderer.send('set-reminder', { reminder, time, unit });
     const text = `Ok, I'll remind you to "${reminder}" in ${time} ${unitText}.`;
-    resultsDisplay.textContent = text;
-    showBingLink();
-    speak(text, onActionFinished);
+    displayAndSpeak(text, onActionFinished, { showBingLink: true });
 }
 
 async function handleOpenApplication(appName) {
-    resultsDisplay.textContent = `Looking for ${appName}...`;
-    speak(resultsDisplay.textContent);
+    displayAndSpeak(`Looking for ${appName}...`);
 
     const apps = await ipcRenderer.invoke('find-application', appName);
 
     if (apps.length === 0) {
         ipcRenderer.send('open-application-fallback', appName);
         const responseText = `I couldn't find "${appName}" in your Start Menu, but I'll try opening it directly.`;
-        resultsDisplay.textContent = responseText;
-        speak(responseText, onActionFinished);
+        displayAndSpeak(responseText, onActionFinished);
     } else if (apps.length === 1) {
         ipcRenderer.send('open-path', apps[0].path);
         const responseText = `Opening ${apps[0].name}...`;
-        resultsDisplay.textContent = responseText;
-        speak(responseText, onActionFinished);
+        displayAndSpeak(responseText, onActionFinished);
     } else {
         let responseText = "I found a few options. Which one did you mean?";
-        resultsDisplay.innerHTML = `<p style="margin-bottom: 10px;">${responseText}</p>`;
-        apps.slice(0, 5).forEach(app => {
+        resultsDisplay.innerHTML = `<p class="fade-in-item" style="margin-bottom: 10px;">${responseText}</p>`;
+        
+        apps.slice(0, 5).forEach((app, index) => {
             const btn = document.createElement('button');
             btn.textContent = app.name;
-            btn.className = 'choice-button';
+            btn.className = 'choice-button fade-in-item';
+            btn.style.animationDelay = `${index * 100}ms`;
             btn.onclick = () => {
                 ipcRenderer.send('open-path', app.path);
-                resultsDisplay.textContent = `Opening ${app.name}...`;
-                speak(resultsDisplay.textContent, onActionFinished);
+                displayAndSpeak(`Opening ${app.name}...`, onActionFinished);
             };
             resultsDisplay.appendChild(btn);
         });
+        
         speak(responseText, onActionFinished);
         showBingLink();
     }
@@ -326,6 +332,7 @@ function onSearch() {
 
     requestSound.onended = () => {
         bingLinkContainer.style.display = 'none';
+        bingLinkContainer.style.opacity = '0';
         searchBar.placeholder = 'Ask me anything...';
         searchBar.disabled = false;
 
@@ -349,54 +356,41 @@ function onSearch() {
         const isWebSearch = !calculatorMatch && !timeQueryMatch && !genericTimeMatch && !jokeMatch && !retiledMatch && !weatherMatch && !dateMatch && !reminderMatch && !openAppMatch && !burgerDogMatch && !thanksMatch && !byeMatch && !helloMatch && !helpMatch && !marryMatch && !bodyMatch;
 
         gifDisplay.src = speakingGif;
-
+        
         if (isWebSearch) {
             if (navigator.onLine) {
-                resultsDisplay.textContent = `Here's what I found on the web`;
                 showWebView(`https://www.bing.com/search?q=${encodeURIComponent(query)}`);
             } else {
                 const errorText = "Sorry, I can't connect to the internet right now. Please check your connection.";
-                resultsDisplay.textContent = errorText;
-                speak(errorText, onActionFinished);
+                displayAndSpeak(errorText, onActionFinished);
             }
         } else if (burgerDogMatch) {
             const response = "Burger dog, B-B-Burger dog!";
-            resultsDisplay.textContent = response;
-            speak(response, onActionFinished);
+            displayAndSpeak(response, onActionFinished);
         } else if (thanksMatch) {
             const response = "You're welcome!";
-            resultsDisplay.textContent = response;
-            speak(response, onActionFinished);
+            displayAndSpeak(response, onActionFinished);
         } else if (byeMatch) {
             const response = "Goodbye!";
-            resultsDisplay.textContent = response;
-            speak(response, onActionFinished);
+            displayAndSpeak(response, onActionFinished);
         } else if (helloMatch) {
             const response = "Hello there. How can I help you?";
-            resultsDisplay.textContent = response;
-            speak(response, onActionFinished);
+            displayAndSpeak(response, onActionFinished);
         } else if (helpMatch) {
             const response = "I can get the time, date, and weather. I can also do math, set reminders, open apps, tell jokes, and search the web.";
-            resultsDisplay.textContent = response;
-            speak(response, onActionFinished);
+            displayAndSpeak(response, onActionFinished);
         } else if (marryMatch) {
             const response = "I honestly don't think that's in the cards for us.";
-            resultsDisplay.textContent = response;
-            speak(response, onActionFinished);
+            displayAndSpeak(response, onActionFinished);
         } else if (bodyMatch) {
             const response = "What kind of assistant do you think I am??";
-            resultsDisplay.textContent = response;
-            speak(response, onActionFinished);
+            displayAndSpeak(response, onActionFinished);
         } else if (retiledMatch) {
             const response = "Retiled? You mean that one project that gives discontinued services like me a second life? Noble work.";
-            resultsDisplay.textContent = response;
-            showBingLink();
-            speak(response, onActionFinished);
+            displayAndSpeak(response, onActionFinished, { showBingLink: true });
         } else if (jokeMatch) {
             const joke = getJoke();
-            resultsDisplay.textContent = joke;
-            showBingLink();
-            speak(joke, onActionFinished);
+            displayAndSpeak(joke, onActionFinished, { showBingLink: true });
         } else if (weatherMatch) {
             getWeather(weatherMatch[1]);
         } else if (calculatorMatch) {
