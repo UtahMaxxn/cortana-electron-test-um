@@ -227,7 +227,13 @@ function showWebView(url) {
     ipcRenderer.send('set-webview-visibility', true);
     webviewFrame.src = url;
     webviewContainer.classList.add('visible');
-    displayAndSpeak(`Here's what I found on the web`, onActionFinished, {}, false);
+    showBingLink();
+}
+
+function performWebSearch(query) {
+    const summaryText = `Here is what I found for "${query}".`;
+    displayAndSpeak(summaryText, onActionFinished, {}, false);
+    showWebView(`https://www.bing.com/search?q=${encodeURIComponent(query)}`);
 }
 
 function showBingLink() {
@@ -466,7 +472,7 @@ function onSearch() {
         
         if (isWebSearch) {
             if (navigator.onLine) {
-                showWebView(`https://www.bing.com/search?q=${encodeURIComponent(query)}`);
+                performWebSearch(query);
             } else {
                 const errorText = "Sorry, I can't connect to the internet right now. Please check your connection.";
                 displayAndSpeak(errorText, onActionFinished, {}, true);

@@ -1,7 +1,7 @@
 {
   "name": "cortana-electron",
-  "version": "1.6.0",
-  "description": "A custom local Cortana client built with Electron.",
+  "version": "1.6.5",
+  "description": "A electron app to bring Cortana back to your desktop!",
   "main": "main.js",
   "author": "BlueySoft",
   "license": "ISC",
