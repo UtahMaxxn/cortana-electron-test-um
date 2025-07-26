@@ -82,15 +82,14 @@ html, body {
 }
 .choice-button {
     background-color: #333;
-    border: 1px solid #555;
+    border: 1px solid transparent;
     color: white;
-    padding: 8px 15px;
-    margin: 5px;
-    border-radius: 4px;
+    padding: 10px 15px;
+    margin: 4px;
+    border-radius: 0;
     cursor: pointer;
     font-size: 14px;
-    transition: background-color 0.2s;
-    width: 80%;
+    width: 85%;
     text-align: center;
 }
 .choice-button:hover {
