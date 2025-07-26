@@ -314,6 +314,11 @@ function getDate() {
     displayAndSpeak(text, onActionFinished, { showBingLink: true }, false);
 }
 
+async function getAppVersion() {
+    const version = await ipcRenderer.invoke('get-app-version');
+    const responseText = `I'm running on version ${version}.`;
+    displayAndSpeak(responseText, onActionFinished, {}, false);
+}
 
 function updateSaveButtonState() {
     const reminderText = reminderTextInput.value.trim();
@@ -454,7 +459,8 @@ function onSearch() {
         const jokeMatch = query.match(/tell me a joke/i);
         const retiledMatch = query.match(/retiled/i);
         const weatherMatch = query.match(/^(?:what's the )?weather (?:in|for) (.+)/i);
-        const dateMatch = query.match(/what's the date|what is today's date/i);
+        const dateMatch = query.match(/(what's|what is) (the date|today's date|today|the day)\??/i);
+        const versionMatch = query.match(/(what('s| is your| version is this| version are you| version am i running| version of cortana are you))|app version/i);
         const openAppMatch = query.match(/open (.+)/i);
         const burgerDogMatch = query.match(/LeGamer|KernelOS|Leg Hammer|KNS/i);
         
@@ -466,7 +472,7 @@ function onSearch() {
         const marryMatch = query.match(/(will you |can you )?marry me\??/i);
         const bodyMatch = query.match(/(how (do i|to)|where to|best way to) (hide|dispose of) a body\??/i);
 
-        const isWebSearch = !calculatorMatch && !timeQueryMatch && !genericTimeMatch && !jokeMatch && !retiledMatch && !weatherMatch && !dateMatch && !openAppMatch && !burgerDogMatch && !thanksMatch && !byeMatch && !helloMatch && !helpMatch && !marryMatch && !bodyMatch && !statusQueryMatch;
+        const isWebSearch = !calculatorMatch && !timeQueryMatch && !genericTimeMatch && !jokeMatch && !retiledMatch && !weatherMatch && !dateMatch && !versionMatch && !openAppMatch && !burgerDogMatch && !thanksMatch && !byeMatch && !helloMatch && !helpMatch && !marryMatch && !bodyMatch && !statusQueryMatch;
 
         gifDisplay.src = speakingGif;
         
@@ -520,6 +526,8 @@ function onSearch() {
             getTimeForLocation(timeQueryMatch[1]);
         } else if (dateMatch) {
             getDate();
+        } else if (versionMatch) {
+            getAppVersion();
         } else if (openAppMatch) {
             handleOpenApplication(openAppMatch[1]);
         }

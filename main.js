@@ -28,12 +28,13 @@ if (!gotTheLock) {
 
 function showWindow() {
   if (mainWindow && !mainWindow.isDestroyed()) {
-    const point = screen.getCursorScreenPoint();
-    const display = screen.getDisplayNearestPoint(point);
-    const { x, height: screenHeight } = display.workArea;
-
-    mainWindow.setPosition(x, screenHeight - winHeight);
-
+    if (!mainWindow.isVisible()) {
+      const point = screen.getCursorScreenPoint();
+      const display = screen.getDisplayNearestPoint(point);
+      const { x, height: screenHeight } = display.workArea;
+      mainWindow.setPosition(x, screenHeight - winHeight);
+    }
+    
     isClosing = false;
     mainWindow.show();
     mainWindow.focus();
@@ -196,6 +197,10 @@ function createWindow() {
         }).show();
       }
     }, timeInMs);
+  });
+
+  ipcMain.handle('get-app-version', () => {
+    return app.getVersion();
   });
 
   ipcMain.on('set-webview-visibility', (event, visible) => {

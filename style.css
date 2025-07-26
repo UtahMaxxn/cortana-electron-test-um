@@ -149,8 +149,8 @@ html, body {
 #webview-container {
     display: none;
     position: absolute;
-    top: 180px;
-    height: calc(100% - 180px);
+    top: 210px;
+    height: calc(100% - 210px);
     width: 100%;
     opacity: 0;
     pointer-events: none;
