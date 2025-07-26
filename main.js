@@ -48,7 +48,6 @@ async function findApplicationsIn(folder) {
       }
     }
   } catch (err) {
-    //
   }
   return results;
 }
@@ -102,7 +101,7 @@ function createWindow() {
   };
 
   const handleBlur = () => {
-    if (!mainWindow || mainWindow.isDestroyed() || isWebViewVisible) {
+    if (!mainWindow || mainWindow.isDestroyed()) {
       return;
     }
     closeApp();
