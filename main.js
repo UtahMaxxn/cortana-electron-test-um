@@ -8,6 +8,7 @@ app.setAppUserModelId(APP_ID);
 
 let mainWindow;
 const winWidth = 360;
+const winHeight = 640;
 let isWebViewVisible = false;
 let tray = null;
 let isClosing = false;
@@ -27,6 +28,12 @@ if (!gotTheLock) {
 
 function showWindow() {
   if (mainWindow && !mainWindow.isDestroyed()) {
+    const point = screen.getCursorScreenPoint();
+    const display = screen.getDisplayNearestPoint(point);
+    const { x, height: screenHeight } = display.workArea;
+
+    mainWindow.setPosition(x, screenHeight - winHeight);
+
     isClosing = false;
     mainWindow.show();
     mainWindow.focus();
@@ -55,9 +62,9 @@ async function findApplicationsIn(folder) {
 }
 
 function createWindow() {
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { x, height: screenHeight } = primaryDisplay.workArea;
-  const winHeight = 640;
+  const point = screen.getCursorScreenPoint();
+  const display = screen.getDisplayNearestPoint(point);
+  const { x, height: screenHeight } = display.workArea;
 
   mainWindow = new BrowserWindow({
     width: winWidth,
