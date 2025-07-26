@@ -20,6 +20,24 @@
                         </div>
                     </div>
                 </div>
+
+                <div id="reminder-container">
+                    <img id="reminder-icon" src="assets/idle.gif" alt="Cortana Icon">
+                    <p class="reminder-title">What do you want to be reminded about?</p>
+                    
+                    <div class="reminder-form">
+                        <label class="reminder-label-gray">Reminder</label>
+                        <input type="text" id="reminder-text-input" placeholder="Remember to...">
+                        
+                        <input type="text" id="reminder-time-input" placeholder="Time (e.g., 5 minutes)">
+
+                        <div class="reminder-actions">
+                            <button id="reminder-save-btn">Save</button>
+                            <button id="reminder-cancel-btn">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+
             </div>
             <div id="webview-container" class="content-pane">
                 <webview id="webview-frame" style="width:100%; height:100%;"></webview>

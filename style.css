@@ -198,3 +198,89 @@ html, body {
     color: #74776f;
     opacity: 1;
 }
+
+#reminder-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #171717;
+    color: white;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px 35px;
+    z-index: 5;
+}
+#reminder-container.visible {
+    display: flex;
+    animation: fadeIn 0.3s ease-in-out forwards;
+}
+#reminder-icon {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 20px;
+}
+.reminder-title {
+    font-size: 22px;
+    color: #0078d7;
+    margin-bottom: 25px;
+    font-weight: 300;
+}
+.reminder-form {
+    width: 100%;
+}
+.reminder-label-gray {
+    font-size: 14px;
+    color: #a2a2a2;
+    margin-bottom: 4px;
+    display: block;
+}
+#reminder-text-input, #reminder-time-input {
+    width: 100%;
+    background-color: transparent;
+    border: 1px solid #0078d7;
+    color: white;
+    font-size: 18px;
+    padding: 10px 12px;
+    outline: none;
+    margin-bottom: 15px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+#reminder-text-input::placeholder, #reminder-time-input::placeholder {
+    color: #74776f;
+}
+
+.reminder-actions {
+    margin-top: 20px;
+    width: 100%;
+    display: flex;
+    gap: 10px;
+}
+.reminder-actions button {
+    flex-grow: 1;
+    border: none;
+    color: white;
+    padding: 12px 0;
+    cursor: pointer;
+    font-size: 15px;
+    transition: background-color 0.2s;
+}
+.reminder-actions button:hover {
+    filter: brightness(1.2);
+}
+#reminder-save-btn {
+    background-color: #0078d7;
+}
+#reminder-cancel-btn {
+    background-color: #5a5a5a;
+}
+#reminder-save-btn:disabled {
+    background-color: #4c4c4c;
+    color: #888;
+    cursor: not-allowed;
+}
+#reminder-save-btn:disabled:hover {
+    filter: none;
+}
