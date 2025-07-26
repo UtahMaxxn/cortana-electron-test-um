@@ -18,6 +18,9 @@ const speakingGif = path.join(appRoot, 'speaking.gif');
 const speakingEndGif = path.join(appRoot, 'speaking-end.gif');
 const thinkingGif = path.join(appRoot, 'thinking.gif');
 const requestSound = new Audio(path.join(appRoot, 'request.wav'));
+const onSound = new Audio(path.join(appRoot, 'on.wav'));
+const offSound = new Audio(path.join(appRoot, 'off.wav'));
+const errorSound = new Audio(path.join(appRoot, 'error.wav'));
 
 const PREFERRED_VOICE_NAME = "Microsoft Zira Desktop";
 
@@ -59,7 +62,11 @@ window.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('close-btn').addEventListener('click', () => ipcRenderer.send('close-app'));
     searchBar.addEventListener('keydown', (event) => { if (event.key === 'Enter') onSearch(); });
-    searchBar.addEventListener('focus', setStateIdle);
+    searchBar.addEventListener('focus', () => {
+        setStateIdle();
+        onSound.play();
+    });
+    searchBar.addEventListener('blur', () => offSound.play());
 
     bingLink.addEventListener('click', (e) => {
         e.preventDefault();
@@ -97,7 +104,7 @@ window.addEventListener('DOMContentLoaded', () => {
     ipcRenderer.on('command-failed', (event, { command }) => {
         if (command === 'open-application') {
             const errorText = `Sorry, I had trouble opening that. Make sure it's installed correctly.`;
-            displayAndSpeak(errorText, onActionFinished);
+            displayAndSpeak(errorText, onActionFinished, {}, true);
         }
     });
 
@@ -106,7 +113,7 @@ window.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => { searchBar.focus(); }, 400);
 });
 
-function displayAndSpeak(text, callback, options = {}) {
+function displayAndSpeak(text, callback, options = {}, isError = false) {
     resultsDisplay.innerHTML = '';
 
     const p = document.createElement('p');
@@ -118,7 +125,12 @@ function displayAndSpeak(text, callback, options = {}) {
         showBingLink();
     }
 
-    speak(text, callback);
+    if (isError) {
+        errorSound.play();
+        errorSound.onended = () => speak(text, callback);
+    } else {
+        speak(text, callback);
+    }
 }
 
 function setupTTS() {
@@ -171,6 +183,9 @@ function onActionFinished() {
 
     isBusy = false;
     gifDisplay.src = speakingEndGif;
+    searchBar.disabled = false;
+    searchBar.placeholder = 'Type here to search';
+
     finishSpeakingTimeout = setTimeout(() => {
         if (animationContainer.className === 'active') {
             gifDisplay.src = idleGif;
@@ -212,7 +227,7 @@ function showWebView(url) {
     ipcRenderer.send('set-webview-visibility', true);
     webviewFrame.src = url;
     webviewContainer.classList.add('visible');
-    displayAndSpeak(`Here's what I found on the web`, onActionFinished);
+    displayAndSpeak(`Here's what I found on the web`, onActionFinished, {}, false);
 }
 
 function showBingLink() {
@@ -231,10 +246,11 @@ function calculate(query) {
             throw new Error('Invalid calculation');
         }
         responseText = `The answer is ${result}.`;
+        displayAndSpeak(responseText, onActionFinished, { showBingLink: true }, false);
     } catch (error) {
         responseText = `Sorry, that doesn't look like a valid calculation.`;
+        displayAndSpeak(responseText, onActionFinished, { showBingLink: true }, true);
     }
-    displayAndSpeak(responseText, onActionFinished, { showBingLink: true });
 }
 
 async function getWeather(location) {
@@ -247,10 +263,11 @@ async function getWeather(location) {
         const data = await response.json();
         const condition = data.current_condition[0];
         responseText = `The current weather in ${data.nearest_area[0].areaName[0].value} is ${condition.temp_F}°F and ${condition.weatherDesc[0].value}.`;
+        displayAndSpeak(responseText, onActionFinished, { showBingLink: true }, false);
     } catch (error) {
         responseText = `Sorry, I couldn't get the weather for ${location}.`;
+        displayAndSpeak(responseText, onActionFinished, { showBingLink: true }, true);
     }
-    displayAndSpeak(responseText, onActionFinished, { showBingLink: true });
 }
 
 async function getTimeForLocation(rawInput) {
@@ -272,22 +289,23 @@ async function getTimeForLocation(rawInput) {
         const formattedTime = dateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const apiAbbreviation = data.abbreviation ? `(${data.abbreviation})` : '';
         text = `The time in ${rawInput.trim()} ${apiAbbreviation} is ${formattedTime}.`;
+        displayAndSpeak(text, onActionFinished, { showBingLink: true }, false);
     } catch (error) {
         text = `Sorry, I couldn't find the time for '${rawInput.trim()}'.`;
+        displayAndSpeak(text, onActionFinished, { showBingLink: true }, true);
     }
-    displayAndSpeak(text, onActionFinished, { showBingLink: true });
 }
 
 function getLocalTime() {
     const now = new Date();
     const text = `The local time is ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-    displayAndSpeak(text, onActionFinished, { showBingLink: true });
+    displayAndSpeak(text, onActionFinished, { showBingLink: true }, false);
 }
 
 function getDate() {
     const now = new Date();
     const text = `Today's date is ${now.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`;
-    displayAndSpeak(text, onActionFinished, { showBingLink: true });
+    displayAndSpeak(text, onActionFinished, { showBingLink: true }, false);
 }
 
 
@@ -336,25 +354,28 @@ function onSaveReminder() {
         setStateActive();
         gifDisplay.src = speakingGif;
 
-        displayAndSpeak(text, onActionFinished);
+        displayAndSpeak(text, onActionFinished, {}, false);
     } else {
-        speak("Please make sure the time is valid, for example '2 minutes' or '30 seconds'.");
+        errorSound.play();
+        errorSound.onended = () => {
+            speak("Please make sure the time is valid, for example '2 minutes' or '30 seconds'.");
+        };
     }
 }
 
 async function handleOpenApplication(appName) {
-    displayAndSpeak(`Looking for ${appName}...`);
+    displayAndSpeak(`Looking for ${appName}...`, onActionFinished, {}, false);
 
     const apps = await ipcRenderer.invoke('find-application', appName);
 
     if (apps.length === 0) {
         ipcRenderer.send('open-application-fallback', appName);
         const responseText = `I couldn't find "${appName}" in your Start Menu, but I'll try opening it directly.`;
-        displayAndSpeak(responseText, onActionFinished);
+        displayAndSpeak(responseText, onActionFinished, {}, false);
     } else if (apps.length === 1) {
         ipcRenderer.send('open-path', apps[0].path);
         const responseText = `Opening ${apps[0].name}...`;
-        displayAndSpeak(responseText, onActionFinished);
+        displayAndSpeak(responseText, onActionFinished, {}, false);
     } else {
         let responseText = "I found a few options. Which one did you mean?";
         resultsDisplay.innerHTML = `<p class="fade-in-item" style="margin-bottom: 10px;">${responseText}</p>`;
@@ -366,7 +387,7 @@ async function handleOpenApplication(appName) {
             btn.style.animationDelay = `${index * 100}ms`;
             btn.onclick = () => {
                 ipcRenderer.send('open-path', app.path);
-                displayAndSpeak(`Opening ${app.name}...`, onActionFinished);
+                displayAndSpeak(`Opening ${app.name}...`, onActionFinished, {}, false);
             };
             resultsDisplay.appendChild(btn);
         });
@@ -397,7 +418,6 @@ function onSearch() {
     requestSound.onended = () => {
         bingLinkContainer.style.display = 'none';
         bingLinkContainer.style.opacity = '0';
-        searchBar.disabled = false;
 
         const reminderWithTimeMatch = query.match(/remind me to (.+?) in (.+)/i);
         const reminderWithoutTimeMatch = query.match(/remind me to (.+)/i);
@@ -431,14 +451,16 @@ function onSearch() {
         const dateMatch = query.match(/what's the date|what is today's date/i);
         const openAppMatch = query.match(/open (.+)/i);
         const burgerDogMatch = query.match(/LeGamer|KernelOS|Leg Hammer|KNS/i);
-        const thanksMatch = query.match(/^(thanks|thank you|thx)(.+)?(!|\.)?$/i);
-        const byeMatch = query.match(/^(bye|goodbye|see ya|later)(!|\.)?$/i);
-        const helloMatch = query.match(/^(hello|hi|hey|yo|what's up|hey there)(!|\.)?$/i);
+        
+        const statusQueryMatch = query.match(/(what's up|sup|how's it going|how are you)\??/i);
+        const thanksMatch = query.match(/^(thanks|thank you|thx|ty)(.+)?(!|\.)?$/i);
+        const byeMatch = query.match(/^(bye|goodbye|see ya|later|cya|see you later)(!|\.)?$/i);
+        const helloMatch = query.match(/^(hello|hi|hey|yo|heya|hey there)(!|\.)?$/i);
         const helpMatch = query.match(/(what can you do|what are your skills|help|what can i ask you)\??/i);
         const marryMatch = query.match(/(will you |can you )?marry me\??/i);
         const bodyMatch = query.match(/(how (do i|to)|where to|best way to) (hide|dispose of) a body\??/i);
 
-        const isWebSearch = !calculatorMatch && !timeQueryMatch && !genericTimeMatch && !jokeMatch && !retiledMatch && !weatherMatch && !dateMatch && !openAppMatch && !burgerDogMatch && !thanksMatch && !byeMatch && !helloMatch && !helpMatch && !marryMatch && !bodyMatch;
+        const isWebSearch = !calculatorMatch && !timeQueryMatch && !genericTimeMatch && !jokeMatch && !retiledMatch && !weatherMatch && !dateMatch && !openAppMatch && !burgerDogMatch && !thanksMatch && !byeMatch && !helloMatch && !helpMatch && !marryMatch && !bodyMatch && !statusQueryMatch;
 
         gifDisplay.src = speakingGif;
         
@@ -447,35 +469,41 @@ function onSearch() {
                 showWebView(`https://www.bing.com/search?q=${encodeURIComponent(query)}`);
             } else {
                 const errorText = "Sorry, I can't connect to the internet right now. Please check your connection.";
-                displayAndSpeak(errorText, onActionFinished);
+                displayAndSpeak(errorText, onActionFinished, {}, true);
             }
         } else if (burgerDogMatch) {
             const response = "Burger dog, B-B-Burger dog!";
-            displayAndSpeak(response, onActionFinished);
+            displayAndSpeak(response, onActionFinished, {}, false);
+        } else if (statusQueryMatch) {
+            const response = "Nothing much. What may I help you with?";
+            displayAndSpeak(response, onActionFinished, {}, false);
         } else if (thanksMatch) {
-            const response = "You're welcome!";
-            displayAndSpeak(response, onActionFinished);
+            const responses = ["You're welcome!", "No problem.", "Happy to help!"];
+            const response = responses[Math.floor(Math.random() * responses.length)];
+            displayAndSpeak(response, onActionFinished, {}, false);
         } else if (byeMatch) {
-            const response = "Goodbye!";
-            displayAndSpeak(response, onActionFinished);
+            const responses = ["Goodbye!", "See you later.", "Catch you later."];
+            const response = responses[Math.floor(Math.random() * responses.length)];
+            displayAndSpeak(response, onActionFinished, {}, false);
         } else if (helloMatch) {
-            const response = "Hello there. How can I help you?";
-            displayAndSpeak(response, onActionFinished);
+            const responses = ["Hello there. How can I help you?", "Hi! What's on your mind?", "Hey! What can I do for you?"];
+            const response = responses[Math.floor(Math.random() * responses.length)];
+            displayAndSpeak(response, onActionFinished, {}, false);
         } else if (helpMatch) {
             const response = "I can get the time, date, and weather. I can also do math, set reminders, open apps, tell jokes, and search the web.";
-            displayAndSpeak(response, onActionFinished);
+            displayAndSpeak(response, onActionFinished, {}, false);
         } else if (marryMatch) {
             const response = "I honestly don't think that's in the cards for us.";
-            displayAndSpeak(response, onActionFinished);
+            displayAndSpeak(response, onActionFinished, {}, false);
         } else if (bodyMatch) {
             const response = "What kind of assistant do you think I am??";
-            displayAndSpeak(response, onActionFinished);
+            displayAndSpeak(response, onActionFinished, {}, true);
         } else if (retiledMatch) {
             const response = "Retiled? You mean that one project that gives discontinued services like me a second life? Noble work.";
-            displayAndSpeak(response, onActionFinished, { showBingLink: true });
+            displayAndSpeak(response, onActionFinished, { showBingLink: true }, false);
         } else if (jokeMatch) {
             const joke = getJoke();
-            displayAndSpeak(joke, onActionFinished, { showBingLink: true });
+            displayAndSpeak(joke, onActionFinished, { showBingLink: true }, false);
         } else if (weatherMatch) {
             getWeather(weatherMatch[1]);
         } else if (calculatorMatch) {
