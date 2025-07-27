@@ -8,7 +8,12 @@
 <body>
     <div id="app-container">
         <div class="main-container">
-            <div id="close-btn" title="Close Application">×</div>
+            <div id="settings-btn" title="Settings">
+                <img src="assets/settings.png" alt="Settings Icon">
+            </div>
+            <div id="close-btn" title="Close Application">
+                <img src="assets/close.png" alt="Close Icon">
+            </div>
             <div id="cortana-container" class="content-pane">
                 <div id="animation-container">
                     <img id="gif-display">
@@ -34,12 +39,40 @@
                         </div>
                     </div>
                 </div>
+                <div id="settings-container">
+                    <div class="settings-header">
+                        <button id="settings-back-btn">←</button>
+                        <h1>Settings</h1>
+                    </div>
+                    <div class="settings-content">
+                        <div class="settings-section">
+                            <h2>Personalisation</h2>
+                            <div class="setting-item">
+                                <label for="voice-select">Voice</label>
+                                <select id="voice-select"></select>
+                            </div>
+                            <p id="voice-warning" class="setting-warning">Cortana's default voice (Microsoft Zira Desktop) is not available.</p>
+                        </div>
+                        <div class="settings-section">
+                            <h2>System</h2>
+                            <div class="setting-item">
+                                <label for="startup-toggle-label">Start with Windows</label>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="startup-toggle">
+                                    <span class="slider round"></span>
+                                </label>
+                            </div>
+                             <p id="startup-warning" class="setting-warning">Reminders may not work as expected until Cortana is launched manually.</p>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div id="webview-container" class="content-pane">
                 <webview id="webview-frame" style="width:100%; height:100%;"></webview>
             </div>
         </div>
         <div class="search-container">
+            <img id="search-icon" src="assets/cortana.png" alt="Cortana Icon">
             <input type="text" id="search-bar" placeholder="Type here to search">
         </div>
     </div>

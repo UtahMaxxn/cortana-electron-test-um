@@ -10,19 +10,38 @@ let mainWindow;
 const winWidth = 360;
 const winHeight = 640;
 let isWebViewVisible = false;
+let isSettingsVisible = false;
 let tray = null;
 let isClosing = false;
 
 let reminders = [];
 
+let settings = {
+  openAtLogin: true,
+  preferredVoice: "Microsoft Zira Desktop"
+};
+const SETTINGS_FILE = path.join(app.getPath('userData'), 'settings.json');
+
 const isSilentStart = process.argv.includes('--hidden');
 
-app.setLoginItemSettings({
-  openAtLogin: true,
-  args: ['--hidden']
-});
-
 const gotTheLock = app.requestSingleInstanceLock();
+
+async function loadSettings() {
+    try {
+        const data = await fs.readFile(SETTINGS_FILE, 'utf-8');
+        settings = { ...settings, ...JSON.parse(data) };
+    } catch (error) {
+        await saveSettings();
+    }
+}
+
+async function saveSettings() {
+    try {
+        await fs.writeFile(SETTINGS_FILE, JSON.stringify(settings, null, 2));
+    } catch (error) {
+        console.error('Failed to save settings:', error);
+    }
+}
 
 if (!gotTheLock) {
   app.quit();
@@ -32,7 +51,14 @@ if (!gotTheLock) {
       showWindow();
     }
   });
-  app.whenReady().then(createWindow);
+  app.whenReady().then(async () => {
+      await loadSettings();
+      app.setLoginItemSettings({
+          openAtLogin: settings.openAtLogin,
+          args: ['--hidden']
+      });
+      createWindow();
+  });
 }
 
 function showWindow() {
@@ -85,7 +111,7 @@ function createWindow() {
     resizable: false,
     alwaysOnTop: true,
     focusable: true,
-    show: !isSilentStart,
+    show: false,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -121,7 +147,7 @@ function createWindow() {
   };
 
   const handleBlur = () => {
-    if (isWebViewVisible) {
+    if (isWebViewVisible || isSettingsVisible) {
       return;
     }
     if (!mainWindow || mainWindow.isDestroyed()) {
@@ -149,6 +175,23 @@ function createWindow() {
   ipcMain.on('open-external-link', (event, url) => {
     shell.openExternal(url);
     closeApp();
+  });
+
+  ipcMain.handle('get-settings', async () => {
+      return settings;
+  });
+
+  ipcMain.on('set-setting', async (event, { key, value }) => {
+      if (key in settings) {
+          settings[key] = value;
+          if (key === 'openAtLogin') {
+              app.setLoginItemSettings({
+                  openAtLogin: value,
+                  args: ['--hidden']
+              });
+          }
+          await saveSettings();
+      }
   });
 
   ipcMain.handle('find-application', async (event, query) => {
@@ -264,6 +307,10 @@ function createWindow() {
 
   ipcMain.on('set-webview-visibility', (event, visible) => {
     isWebViewVisible = visible;
+  });
+
+  ipcMain.on('set-settings-visibility', (event, visible) => {
+    isSettingsVisible = visible;
   });
 
   mainWindow.loadFile('index.html');

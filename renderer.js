@@ -1,7 +1,7 @@
 const { ipcRenderer } = require('electron');
 const path = require('path');
 
-let searchBar;
+let searchBar, searchIcon;
 let animationContainer, gifDisplay, resultsDisplay, contentWrapper;
 let webviewContainer, webviewFrame;
 let bingLinkContainer, bingLink;
@@ -11,6 +11,11 @@ let editingReminderId = null;
 
 let reminderContainer, reminderTextInput, reminderTimeInput, reminderSaveBtn, reminderCancelBtn, reminderIcon;
 
+let settingsContainer, settingsBtn, settingsBackBtn, voiceSelect, startupToggle, startupWarning, voiceWarning;
+let availableVoices = [];
+let currentVoice = null;
+let preferredVoiceName = "Microsoft Zira Desktop";
+
 const isPackaged = __dirname.includes('app.asar');
 const appRoot = isPackaged ? path.join(__dirname, '..', 'assets') : path.join(__dirname, 'assets');
 
@@ -18,15 +23,14 @@ const idleGif = path.join(appRoot, 'idle.gif');
 const speakingGif = path.join(appRoot, 'speaking.gif');
 const speakingEndGif = path.join(appRoot, 'speaking-end.gif');
 const thinkingGif = path.join(appRoot, 'thinking.gif');
+const cortanaIcon = path.join(appRoot, 'cortana.png');
+const searchIconPng = path.join(appRoot, 'search.png');
 const requestSound = new Audio(path.join(appRoot, 'request.wav'));
 const onSound = new Audio(path.join(appRoot, 'on.wav'));
 const offSound = new Audio(path.join(appRoot, 'off.wav'));
 const errorSound = new Audio(path.join(appRoot, 'error.wav'));
 
-const PREFERRED_VOICE_NAME = "Microsoft Zira Desktop";
-
 let isBusy = false;
-let ziraVoice = null;
 let lastQuery = '';
 
 const jokes = [
@@ -40,9 +44,10 @@ const jokes = [
 function getJoke() { return jokes[Math.floor(Math.random() * jokes.length)]; }
 const timeZoneAbbreviations = { 'est': 'America/New_York', 'edt': 'America/New_York', 'cst': 'America/Chicago', 'cdt': 'America/Chicago', 'mst': 'America/Denver', 'mdt': 'America/Denver', 'pst': 'America/Los_Angeles', 'pdt': 'America/Los_Angeles', 'gmt': 'Etc/GMT', 'utc': 'Etc/UTC', 'bst': 'Europe/London' };
 
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
     appContainer = document.getElementById('app-container');
     searchBar = document.getElementById('search-bar');
+    searchIcon = document.getElementById('search-icon');
     animationContainer = document.getElementById('animation-container');
     gifDisplay = document.getElementById('gif-display');
     resultsDisplay = document.getElementById('results-display');
@@ -59,15 +64,27 @@ window.addEventListener('DOMContentLoaded', () => {
     reminderSaveBtn = document.getElementById('reminder-save-btn');
     reminderCancelBtn = document.getElementById('reminder-cancel-btn');
 
+    settingsContainer = document.getElementById('settings-container');
+    settingsBtn = document.getElementById('settings-btn');
+    settingsBackBtn = document.getElementById('settings-back-btn');
+    voiceSelect = document.getElementById('voice-select');
+    startupToggle = document.getElementById('startup-toggle');
+    startupWarning = document.getElementById('startup-warning');
+    voiceWarning = document.getElementById('voice-warning');
+
     reminderIcon.src = idleGif;
 
     document.getElementById('close-btn').addEventListener('click', () => ipcRenderer.send('close-app'));
     searchBar.addEventListener('keydown', (event) => { if (event.key === 'Enter') onSearch(); });
     searchBar.addEventListener('focus', () => {
-        setStateIdle();
+        if (animationContainer.className === 'active') setStateIdle();
         onSound.play();
+        searchIcon.src = searchIconPng;
     });
-    searchBar.addEventListener('blur', () => offSound.play());
+    searchBar.addEventListener('blur', () => {
+        offSound.play();
+        searchIcon.src = cortanaIcon;
+    });
 
     bingLink.addEventListener('click', (e) => {
         e.preventDefault();
@@ -84,23 +101,31 @@ window.addEventListener('DOMContentLoaded', () => {
 
     reminderSaveBtn.addEventListener('click', onSaveReminder);
     reminderCancelBtn.addEventListener('click', setStateIdle);
-
     reminderTextInput.addEventListener('input', updateSaveButtonState);
     reminderTimeInput.addEventListener('input', updateSaveButtonState);
 
+    settingsBtn.addEventListener('click', showSettingsUI);
+    settingsBackBtn.addEventListener('click', setStateIdle);
+    voiceSelect.addEventListener('change', onVoiceChanged);
+    startupToggle.addEventListener('change', onStartupToggleChanged);
 
     const mobileUserAgent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Mobile/15E148 Safari/604.1';
     webviewFrame.setAttribute('useragent', mobileUserAgent);
 
     ipcRenderer.on('go-idle-and-close', () => {
         setStateIdle();
+        appContainer.classList.remove('visible');
         setTimeout(() => {
-            appContainer.classList.remove('visible');
-            setTimeout(() => ipcRenderer.send('hide-window'), 400);
-        }, 50);
+            ipcRenderer.send('hide-window');
+        }, 400);
     });
 
-    ipcRenderer.on('trigger-enter-animation', () => { appContainer.classList.add('visible'); });
+    ipcRenderer.on('trigger-enter-animation', () => {
+        setTimeout(() => {
+            appContainer.classList.add('visible');
+            searchBar.focus();
+        }, 100);
+    });
 
     ipcRenderer.on('command-failed', (event, { command }) => {
         if (command === 'open-application') {
@@ -109,10 +134,46 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    await loadAndApplySettings();
     setupTTS();
     setStateIdle();
-    setTimeout(() => { searchBar.focus(); }, 400);
 });
+
+function showSettingsUI() {
+    animationContainer.style.display = 'none';
+    reminderContainer.classList.remove('visible');
+    webviewContainer.classList.remove('visible');
+    ipcRenderer.send('set-webview-visibility', false);
+    ipcRenderer.send('set-settings-visibility', true);
+
+    settingsContainer.classList.add('visible');
+
+    searchBar.disabled = true;
+    searchBar.placeholder = 'Unavailable...';
+    isBusy = false;
+}
+
+async function loadAndApplySettings() {
+    const settings = await ipcRenderer.invoke('get-settings');
+    preferredVoiceName = settings.preferredVoice;
+
+    startupToggle.checked = settings.openAtLogin;
+    startupWarning.style.display = settings.openAtLogin ? 'none' : 'block';
+}
+
+function onVoiceChanged() {
+    const selectedVoiceName = voiceSelect.value;
+    preferredVoiceName = selectedVoiceName;
+    currentVoice = availableVoices.find(v => v.name === selectedVoiceName) || null;
+    ipcRenderer.send('set-setting', { key: 'preferredVoice', value: selectedVoiceName });
+}
+
+function onStartupToggleChanged() {
+    const isEnabled = startupToggle.checked;
+    startupWarning.style.display = isEnabled ? 'none' : 'block';
+    ipcRenderer.send('set-setting', { key: 'openAtLogin', value: isEnabled });
+}
+
 
 function displayAndSpeak(text, callback, options = {}, isError = false) {
     resultsDisplay.innerHTML = '';
@@ -135,42 +196,52 @@ function displayAndSpeak(text, callback, options = {}, isError = false) {
 }
 
 function setupTTS() {
-    function findVoice() {
-        const voices = window.speechSynthesis.getVoices();
-        if (voices.length === 0) return;
+    function populateAndSetVoices() {
+        availableVoices = window.speechSynthesis.getVoices();
+        if (availableVoices.length === 0) return;
 
-        const voicePriorities = [
-            v => v.name === PREFERRED_VOICE_NAME,
-            v => v.lang === 'en-US' && v.name.includes('Desktop'),
-            v => v.lang === 'en-US' && v.name.includes('Zira'),
-            v => v.lang === 'en-US',
-            v => v
-        ];
+        voiceSelect.innerHTML = '';
+        availableVoices.forEach(voice => {
+            const option = document.createElement('option');
+            option.textContent = `${voice.name} (${voice.lang})`;
+            option.value = voice.name;
+            voiceSelect.appendChild(option);
+        });
 
-        for (const priority of voicePriorities) {
-            const foundVoice = voices.find(priority);
-            if (foundVoice) {
-                ziraVoice = foundVoice;
-                return;
+        const ziraIsAvailable = availableVoices.some(v => v.name.includes("Zira"));
+        voiceWarning.style.display = ziraIsAvailable ? 'none' : 'block';
+
+        const preferredVoiceIsAvailable = availableVoices.some(v => v.name === preferredVoiceName);
+
+        if (preferredVoiceIsAvailable) {
+            voiceSelect.value = preferredVoiceName;
+        } else {
+            const defaultVoice = availableVoices.find(v => v.name.includes("Zira")) || availableVoices[0];
+            if (defaultVoice) {
+                voiceSelect.value = defaultVoice.name;
+                preferredVoiceName = defaultVoice.name;
+                ipcRenderer.send('set-setting', { key: 'preferredVoice', value: preferredVoiceName });
             }
         }
+        
+        currentVoice = availableVoices.find(v => v.name === voiceSelect.value) || null;
     }
 
     if (window.speechSynthesis.getVoices().length === 0) {
-        window.speechSynthesis.onvoiceschanged = findVoice;
+        window.speechSynthesis.onvoiceschanged = populateAndSetVoices;
     } else {
-        findVoice();
+        populateAndSetVoices();
     }
 }
 
 function speak(text, onSpeechEndCallback) {
     window.speechSynthesis.cancel();
-    if (!ziraVoice || !text) {
+    if (!currentVoice || !text) {
         if (onSpeechEndCallback) onSpeechEndCallback();
         return;
     }
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.voice = ziraVoice;
+    utterance.voice = currentVoice;
     utterance.onend = () => { if (onSpeechEndCallback) onSpeechEndCallback(); };
     utterance.onerror = () => { if (onSpeechEndCallback) onSpeechEndCallback(); };
     window.speechSynthesis.speak(utterance);
@@ -196,9 +267,14 @@ function onActionFinished() {
 
 function setStateIdle() {
     if (animationContainer.className === 'idle' && document.activeElement === searchBar) return;
+    
+    if (settingsContainer.classList.contains('visible')) {
+        ipcRenderer.send('set-settings-visibility', false);
+    }
 
     editingReminderId = null;
     reminderContainer.classList.remove('visible');
+    settingsContainer.classList.remove('visible');
     animationContainer.style.display = 'block';
 
     clearTimeout(finishSpeakingTimeout);
@@ -208,6 +284,7 @@ function setStateIdle() {
 
     isBusy = false;
 
+    if (searchIcon) searchIcon.src = cortanaIcon;
     ipcRenderer.send('set-webview-visibility', false);
     webviewContainer.classList.remove('visible');
     animationContainer.className = 'idle';

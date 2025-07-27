@@ -3,7 +3,7 @@ A custom, local Cortana client built with Electron, inspired by the classic desi
 
 ### About The Project
 
-As a kid, my Nana got me into tech. What was one thing she let me do? Talk to Cortana. She had a whole Microphone setup for Cortana. I miss those days, and I want Cortana back.
+As a kid, my Nana got me into tech. What was one thing she let me do? Talk to Cortana. She had a whole Microphone setup for Cortana. I miss those days, and I want Cortana back. (I love you Nana!)
 ...
 So, I decided to try and work on bringing Cortana back, the way I remember.
 
@@ -31,6 +31,8 @@ So, I decided to try and work on bringing Cortana back, the way I remember.
 ### Build it yourself
 
 #### Prerequisites
+
+If you want Cortana to be able to speak, make sure you have one or more languages with Speech installed in the Windows computer. Cortana's TTS is Microsoft Zira and will be the default if you have it available. If not, it'll choose whatever you have. You may change this in Cortana's settings pane.
 
 You must have [Node.js](https://nodejs.org/) installed on your system (which includes npm).
 
