@@ -16,8 +16,7 @@ let availableVoices = [];
 let currentVoice = null;
 let preferredVoiceName = "Microsoft Zira Desktop";
 
-const isPackaged = __dirname.includes('app.asar');
-const appRoot = isPackaged ? path.join(__dirname, '..', 'assets') : path.join(__dirname, 'assets');
+const appRoot = path.resolve(__dirname, __dirname.includes('app.asar') ? '../assets' : 'assets');
 
 const idleGif = path.join(appRoot, 'idle.gif');
 const speakingGif = path.join(appRoot, 'speaking.gif');
@@ -25,6 +24,8 @@ const speakingEndGif = path.join(appRoot, 'speaking-end.gif');
 const thinkingGif = path.join(appRoot, 'thinking.gif');
 const cortanaIcon = path.join(appRoot, 'cortana.png');
 const searchIconPng = path.join(appRoot, 'search.png');
+const settingsIconPng = path.join(appRoot, 'settings.png');
+const closeIconPng = path.join(appRoot, 'close.png');
 const requestSound = new Audio(path.join(appRoot, 'request.wav'));
 const onSound = new Audio(path.join(appRoot, 'on.wav'));
 const offSound = new Audio(path.join(appRoot, 'off.wav'));
@@ -72,6 +73,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     startupWarning = document.getElementById('startup-warning');
     voiceWarning = document.getElementById('voice-warning');
 
+    document.getElementById('settings-btn-icon').src = settingsIconPng;
+    document.getElementById('close-btn-icon').src = closeIconPng;
+    searchIcon.src = cortanaIcon;
     reminderIcon.src = idleGif;
 
     document.getElementById('close-btn').addEventListener('click', () => ipcRenderer.send('close-app'));
