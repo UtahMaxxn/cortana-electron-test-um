@@ -21,16 +21,66 @@ let settings = {
   preferredVoice: "Microsoft Zira Desktop"
 };
 const SETTINGS_FILE = path.join(app.getPath('userData'), 'settings.json');
+const REMINDERS_FILE = path.join(app.getPath('userData'), 'reminders.json');
+let iconPath;
 
 const isSilentStart = process.argv.includes('--hidden');
 
 const gotTheLock = app.requestSingleInstanceLock();
+
+const scheduleReminder = (reminderData) => {
+    const timeInMs = new Date(reminderData.time).getTime() - Date.now();
+    if (timeInMs > 0) {
+      const timeout = setTimeout(() => {
+        if (Notification.isSupported()) {
+          new Notification({
+            title: 'Reminder',
+            body: reminderData.text,
+            icon: iconPath
+          }).show();
+        }
+        reminders = reminders.filter(r => r.id !== reminderData.id);
+        saveReminders();
+      }, timeInMs);
+      return timeout;
+    }
+    return null;
+  };
+
+async function saveReminders() {
+    try {
+        const remindersToSave = reminders.map(({ id, text, time }) => ({ id, text, time }));
+        await fs.writeFile(REMINDERS_FILE, JSON.stringify(remindersToSave, null, 2));
+    } catch (error) {
+        console.error('Failed to save reminders:', error);
+    }
+}
+
+async function loadReminders() {
+    try {
+        const data = await fs.readFile(REMINDERS_FILE, 'utf-8');
+        const loadedReminders = JSON.parse(data);
+        reminders = loadedReminders.map(r => {
+            const timeout = scheduleReminder(r);
+            return { ...r, timeout };
+        }).filter(r => r.timeout !== null);
+        await saveReminders();
+    } catch (error) {
+        if (error.code !== 'ENOENT') {
+            console.error('Failed to load reminders:', error);
+        }
+        reminders = [];
+    }
+}
 
 async function loadSettings() {
     try {
         const data = await fs.readFile(SETTINGS_FILE, 'utf-8');
         settings = { ...settings, ...JSON.parse(data) };
     } catch (error) {
+        if (error.code !== 'ENOENT') {
+           console.error('Failed to load settings, using defaults:', error);
+        }
         await saveSettings();
     }
 }
@@ -52,7 +102,23 @@ if (!gotTheLock) {
     }
   });
   app.whenReady().then(async () => {
+      const assetsPath = app.isPackaged
+          ? path.join(process.resourcesPath, 'assets')
+          : path.join(__dirname, 'assets');
+      iconPath = path.join(assetsPath, 'icon.ico');
+
       await loadSettings();
+      
+      const loginSettings = app.getLoginItemSettings();
+      const isEnabledOnStartup = loginSettings.openAtLogin;
+
+      if (settings.openAtLogin !== isEnabledOnStartup) {
+          settings.openAtLogin = isEnabledOnStartup;
+          await saveSettings();
+      }
+
+      await loadReminders();
+      
       app.setLoginItemSettings({
           openAtLogin: settings.openAtLogin,
           args: ['--hidden']
@@ -118,11 +184,6 @@ function createWindow() {
       webviewTag: true,
     },
   });
-
-  const assetsPath = app.isPackaged
-    ? path.join(process.resourcesPath, 'assets')
-    : path.join(__dirname, 'assets');
-  const iconPath = path.join(assetsPath, 'icon.ico');
 
   tray = new Tray(iconPath);
   const contextMenu = Menu.buildFromTemplate([
@@ -237,25 +298,7 @@ function createWindow() {
     });
   });
 
-  const scheduleReminder = (reminderData) => {
-    const timeInMs = new Date(reminderData.time).getTime() - Date.now();
-    if (timeInMs > 0) {
-      const timeout = setTimeout(() => {
-        if (Notification.isSupported()) {
-          new Notification({
-            title: 'Reminder',
-            body: reminderData.text,
-            icon: iconPath
-          }).show();
-        }
-        reminders = reminders.filter(r => r.id !== reminderData.id);
-      }, timeInMs);
-      return timeout;
-    }
-    return null;
-  };
-
-  ipcMain.on('set-reminder', (event, { reminder, reminderTime }) => {
+  ipcMain.on('set-reminder', async (event, { reminder, reminderTime }) => {
     const newReminder = {
       id: Date.now().toString(),
       text: reminder,
@@ -265,10 +308,11 @@ function createWindow() {
     newReminder.timeout = scheduleReminder(newReminder);
     if (newReminder.timeout) {
       reminders.push(newReminder);
+      await saveReminders();
     }
   });
 
-  ipcMain.on('update-reminder', (event, { id, reminder, reminderTime }) => {
+  ipcMain.on('update-reminder', async (event, { id, reminder, reminderTime }) => {
     const reminderIndex = reminders.findIndex(r => r.id === id);
     if (reminderIndex !== -1) {
       const existingReminder = reminders[reminderIndex];
@@ -286,14 +330,16 @@ function createWindow() {
       } else {
         reminders.splice(reminderIndex, 1);
       }
+      await saveReminders();
     }
   });
 
-  ipcMain.on('remove-reminder', (event, id) => {
+  ipcMain.on('remove-reminder', async (event, id) => {
     const reminderIndex = reminders.findIndex(r => r.id === id);
     if (reminderIndex !== -1) {
       clearTimeout(reminders[reminderIndex].timeout);
       reminders.splice(reminderIndex, 1);
+      await saveReminders();
     }
   });
 
