@@ -19,9 +19,12 @@
                     <img id="gif-display">
                     <div id="content-wrapper">
                         <div id="results-display"></div>
-                        <div id="bing-link-container">
+                        <div id="web-link-container">
                             <hr class="divider">
-                            <a href="#" id="bing-link">See more results on Bing.com</a>
+                            <a href="#" id="web-link">
+                                <img id="web-icon" alt="Web Icon">
+                                <span>See more results on the web</span>
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -54,6 +57,16 @@
                             <p id="voice-warning" class="setting-warning">Cortana's default voice (Microsoft Zira Desktop) is not available.</p>
                         </div>
                         <div class="settings-section">
+                            <h2>Search</h2>
+                            <div class="setting-item">
+                                <label for="search-engine-select">Search Engine</label>
+                                <select id="search-engine-select">
+                                    <option value="bing">Bing</option>
+                                    <option value="duckduckgo">DuckDuckGo</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="settings-section">
                             <h2>System</h2>
                             <div class="setting-item">
                                 <label for="startup-toggle-label">Start with Windows</label>
@@ -63,6 +76,13 @@
                                 </label>
                             </div>
                              <p id="startup-warning" class="setting-warning">Reminders may not work as expected until Cortana is launched manually.</p>
+                             <div class="setting-item">
+                                <label for="instant-response-toggle-label">Instant Response</label>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="instant-response-toggle">
+                                    <span class="slider round"></span>
+                                </label>
+                            </div>
                         </div>
                     </div>
                 </div>

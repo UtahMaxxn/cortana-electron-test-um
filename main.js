@@ -18,7 +18,9 @@ let reminders = [];
 
 let settings = {
   openAtLogin: true,
-  preferredVoice: "Microsoft Zira Desktop"
+  preferredVoice: "Microsoft Zira Desktop",
+  searchEngine: "bing",
+  instantResponse: false
 };
 const SETTINGS_FILE = path.join(app.getPath('userData'), 'settings.json');
 const REMINDERS_FILE = path.join(app.getPath('userData'), 'reminders.json');
@@ -108,15 +110,6 @@ if (!gotTheLock) {
       iconPath = path.join(assetsPath, 'icon.ico');
 
       await loadSettings();
-      
-      const loginSettings = app.getLoginItemSettings();
-      const isEnabledOnStartup = loginSettings.openAtLogin;
-
-      if (settings.openAtLogin !== isEnabledOnStartup) {
-          settings.openAtLogin = isEnabledOnStartup;
-          await saveSettings();
-      }
-
       await loadReminders();
       
       app.setLoginItemSettings({
@@ -239,6 +232,11 @@ function createWindow() {
   });
 
   ipcMain.handle('get-settings', async () => {
+      const loginSettings = app.getLoginItemSettings();
+      if (settings.openAtLogin !== loginSettings.openAtLogin) {
+          settings.openAtLogin = loginSettings.openAtLogin;
+          await saveSettings();
+      }
       return settings;
   });
 
