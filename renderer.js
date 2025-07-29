@@ -40,7 +40,13 @@ const jokes = [
     "Why did the scarecrow win an award? Because he was outstanding in his field!",
     "I'm reading a book on anti-gravity. It's impossible to put down!",
     "What do you call a fake noodle? An Impasta!",
-    "Why don't skeletons fight each other? They don't have the guts."
+    "Why don't skeletons fight each other? They don't have the guts.",
+    "Why did the math book look sad? Because it had too many problems.",
+    "Why can't you hear a pterodactyl go to the bathroom? Because the 'P' is silent.",
+    "What do you call cheese that isn't yours? Nacho cheese.",
+    "Why did the golfer bring two pairs of pants? In case he got a hole in one.",
+    "How do you organize a space party? You planet.",
+    "Why did the bicycle fall over? Because it was two-tired."
 ];
 function getJoke() { return jokes[Math.floor(Math.random() * jokes.length)]; }
 const timeZoneAbbreviations = { 'est': 'America/New_York', 'edt': 'America/New_York', 'cst': 'America/Chicago', 'cdt': 'America/Chicago', 'mst': 'America/Denver', 'mdt': 'America/Denver', 'pst': 'America/Los_Angeles', 'pdt': 'America/Los_Angeles', 'gmt': 'Etc/GMT', 'utc': 'Etc/UTC', 'bst': 'Europe/London' };
