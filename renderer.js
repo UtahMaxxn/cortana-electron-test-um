@@ -84,18 +84,13 @@ const jokes = [
 function getJoke() { return jokes[Math.floor(Math.random() * jokes.length)]; }
 const timeZoneAbbreviations = { 'est': 'America/New_York', 'edt': 'America/New_York', 'cst': 'America/Chicago', 'cdt': 'America/Chicago', 'mst': 'America/Denver', 'mdt': 'America/Denver', 'pst': 'America/Los_Angeles', 'pdt': 'America/Los_Angeles', 'gmt': 'Etc/GMT', 'utc': 'Etc/UTC', 'bst': 'Europe/London' };
 
-function updateDraggableRegions(isMovable) {
-    const dragBar = document.getElementById('drag-bar');
-    const settingsHeader = document.querySelector('.settings-header');
-    
-    if (dragBar) {
-        dragBar.classList.toggle('is-draggable', isMovable);
-    }
-    if (settingsHeader) {
-        settingsHeader.classList.toggle('is-draggable', isMovable);
+function applyMovableModeStyles(isMovable) {
+    if (isMovable) {
+        document.body.classList.add('movable-mode');
+    } else {
+        document.body.classList.remove('movable-mode');
     }
 }
-
 
 window.addEventListener('DOMContentLoaded', async () => {
     appContainer = document.getElementById('app-container');
@@ -234,6 +229,8 @@ window.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
+    ipcRenderer.on('show-settings-ui', showSettingsUI);
+
     await loadAndApplySettings();
     setupTTS();
     
@@ -304,7 +301,7 @@ async function loadAndApplySettings() {
     instantResponseToggle.checked = settings.instantResponse;
 
     movableToggle.checked = settings.isMovable;
-    updateDraggableRegions(settings.isMovable);
+    applyMovableModeStyles(settings.isMovable);
     
     themeColor = settings.themeColor || "#0078d7";
     themeColorPicker.value = themeColor;
@@ -438,7 +435,6 @@ function onStartupToggleChanged() {
 function onMovableToggleChanged() {
     const isEnabled = movableToggle.checked;
     ipcRenderer.send('set-setting', { key: 'isMovable', value: isEnabled });
-    updateDraggableRegions(isEnabled);
 }
 
 function onSearchEngineChanged() {

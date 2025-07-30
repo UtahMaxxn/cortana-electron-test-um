@@ -125,13 +125,11 @@ if (!gotTheLock) {
 
 function showWindow() {
   if (mainWindow && !mainWindow.isDestroyed()) {
-    if (!mainWindow.isVisible()) {
+    if (!mainWindow.isVisible() && !settings.isMovable) {
       const point = screen.getCursorScreenPoint();
       const display = screen.getDisplayNearestPoint(point);
       const { x, height: screenHeight } = display.workArea;
-      if (!settings.isMovable) {
-          mainWindow.setPosition(x, screenHeight - winHeight);
-      }
+      mainWindow.setPosition(x, screenHeight - winHeight);
     }
     isClosing = false;
     mainWindow.show();
@@ -161,238 +159,253 @@ async function findApplicationsIn(folder) {
 }
 
 function createWindow() {
-  const point = screen.getCursorScreenPoint();
-  const display = screen.getDisplayNearestPoint(point);
-  const { x, height: screenHeight } = display.workArea;
+    const winOptions = {
+        width: winWidth,
+        height: winHeight,
+        frame: settings.isMovable,
+        transparent: !settings.isMovable,
+        resizable: settings.isMovable,
+        alwaysOnTop: !settings.isMovable,
+        focusable: true,
+        show: false,
+        webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: false,
+            webviewTag: true,
+        },
+    };
 
-  mainWindow = new BrowserWindow({
-    width: winWidth,
-    height: winHeight,
-    x: x,
-    y: screenHeight - winHeight,
-    transparent: true,
-    frame: false,
-    resizable: false,
-    alwaysOnTop: true,
-    focusable: true,
-    show: false,
-    movable: settings.isMovable,
-    webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
-      webviewTag: true,
-    },
-  });
-
-  tray = new Tray(iconPath);
-  const contextMenu = Menu.buildFromTemplate([
-    { label: 'Show Cortana', click: showWindow },
-    { type: 'separator' },
-    { label: 'Quit', click: () => { app.isQuitting = true; app.quit(); } }
-  ]);
-  tray.setToolTip('Cortana');
-  tray.setContextMenu(contextMenu);
-  tray.on('click', () => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.isVisible() ? closeApp() : showWindow();
+    if (!settings.isMovable) {
+        const point = screen.getCursorScreenPoint();
+        const display = screen.getDisplayNearestPoint(point);
+        const { x, height: screenHeight } = display.workArea;
+        winOptions.x = x;
+        winOptions.y = screenHeight - winHeight;
     }
-  });
 
-  const closeApp = () => {
-    if (isClosing || !mainWindow || mainWindow.isDestroyed() || !mainWindow.isVisible()) {
-      return;
+    mainWindow = new BrowserWindow(winOptions);
+    if(settings.isMovable) {
+      mainWindow.setMenu(null);
     }
-    isClosing = true;
-    mainWindow.webContents.send('go-idle-and-close');
-  };
 
-  const handleBlur = () => {
-    if (isWebViewVisible || isSettingsVisible) {
-      return;
-    }
-    if (!mainWindow || mainWindow.isDestroyed()) {
-      return;
-    }
-    closeApp();
-  };
-
-  mainWindow.on('blur', handleBlur);
-  mainWindow.on('close', (event) => {
-    if (!app.isQuitting) {
-      event.preventDefault();
-      closeApp();
-    }
-  });
-
-  ipcMain.on('hide-window', () => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.hide();
-    }
-    isClosing = false;
-  });
-
-  ipcMain.on('close-app', closeApp);
-  ipcMain.on('open-external-link', (event, url) => {
-    shell.openExternal(url);
-    closeApp();
-  });
-
-  ipcMain.handle('get-settings', async () => {
-      const loginSettings = app.getLoginItemSettings();
-      if (settings.openAtLogin !== loginSettings.openAtLogin) {
-          settings.openAtLogin = loginSettings.openAtLogin;
-          await saveSettings();
-      }
-      return settings;
-  });
-
-  ipcMain.on('set-setting', async (event, { key, value }) => {
-      if (key in settings) {
-          settings[key] = value;
-          if (key === 'openAtLogin') {
-              app.setLoginItemSettings({
-                  openAtLogin: value,
-                  args: ['--hidden']
-              });
-          }
-          if (key === 'isMovable') {
-            if (mainWindow && !mainWindow.isDestroyed()) {
-                mainWindow.setMovable(value);
-                if (!value) {
-                    const display = screen.getDisplayMatching(mainWindow.getBounds());
-                    const { x, height: screenHeight } = display.workArea;
-                    mainWindow.setPosition(x, screenHeight - winHeight);
+    tray = new Tray(iconPath);
+    const contextMenu = Menu.buildFromTemplate([
+        { label: 'Show Cortana', click: showWindow },
+        {
+            label: 'Settings',
+            click: () => {
+                if (mainWindow) {
+                    showWindow();
+                    mainWindow.webContents.send('show-settings-ui');
                 }
             }
-          }
-          await saveSettings();
-      }
-  });
-
-  ipcMain.on('set-custom-responses', async (event, responses) => {
-    if (Array.isArray(responses)) {
-        settings.customResponses = responses;
-        await saveSettings();
-    }
-  });
-
-  ipcMain.handle('find-application', async (event, query) => {
-    const queryLower = query.toLowerCase();
-    const allApps = new Map();
-
-    const startMenuFolders = [
-      path.join('C:', 'ProgramData', 'Microsoft', 'Windows', 'Start Menu', 'Programs'),
-      app.getPath('appData') ? path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs') : null
-    ].filter(Boolean);
-
-    for (const folder of startMenuFolders) {
-      const appsInFolder = await findApplicationsIn(folder);
-      for (const app of appsInFolder) {
-        if (!allApps.has(app.name)) {
-          allApps.set(app.name, app.path);
+        },
+        { type: 'separator' },
+        { label: 'Quit', click: () => { app.isQuitting = true; app.quit(); } }
+    ]);
+    tray.setToolTip('Cortana');
+    tray.setContextMenu(contextMenu);
+    tray.on('click', () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.isVisible() ? closeApp() : showWindow();
         }
-      }
-    }
-
-    const matchingApps = [];
-    for (const [name, path] of allApps.entries()) {
-      if (name.toLowerCase().includes(queryLower)) {
-        matchingApps.push({ name, path });
-      }
-    }
-    return matchingApps;
-  });
-
-  ipcMain.on('open-application-fallback', (event, appName) => {
-    const sanitizedAppName = appName.replace(/"/g, '');
-    exec(`start "" "${sanitizedAppName}"`, (error) => {
-      if (error) {
-        console.error(`Fallback failed to open app ${appName}:`, error);
-        mainWindow.webContents.send('command-failed', { command: 'open-application' });
-      }
     });
-  });
 
-  ipcMain.on('open-path', (event, fsPath) => {
-    shell.openPath(fsPath).catch(err => {
-      console.error(`Failed to open path ${fsPath}:`, err);
-    });
-  });
-
-  ipcMain.on('set-reminder', async (event, { reminder, reminderTime }) => {
-    const newReminder = {
-      id: Date.now().toString(),
-      text: reminder,
-      time: reminderTime,
-      timeout: null
+    const closeApp = () => {
+        if (isClosing || !mainWindow || mainWindow.isDestroyed() || !mainWindow.isVisible()) {
+            return;
+        }
+        isClosing = true;
+        mainWindow.webContents.send('go-idle-and-close');
     };
-    newReminder.timeout = scheduleReminder(newReminder);
-    if (newReminder.timeout) {
-      reminders.push(newReminder);
-      await saveReminders();
-    }
-  });
 
-  ipcMain.on('update-reminder', async (event, { id, reminder, reminderTime }) => {
-    const reminderIndex = reminders.findIndex(r => r.id === id);
-    if (reminderIndex !== -1) {
-      const existingReminder = reminders[reminderIndex];
-      clearTimeout(existingReminder.timeout);
+    const handleBlur = () => {
+        if (isWebViewVisible || isSettingsVisible || settings.isMovable) {
+            return;
+        }
+        if (!mainWindow || mainWindow.isDestroyed()) {
+            return;
+        }
+        closeApp();
+    };
 
-      const updatedReminder = {
-        ...existingReminder,
-        text: reminder,
-        time: reminderTime
-      };
+    mainWindow.on('blur', handleBlur);
+    mainWindow.on('close', (event) => {
+        if (!app.isQuitting) {
+            event.preventDefault();
+            if (settings.isMovable) {
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.hide();
+                }
+            } else {
+                closeApp();
+            }
+        }
+    });
 
-      updatedReminder.timeout = scheduleReminder(updatedReminder);
-      if (updatedReminder.timeout) {
-        reminders[reminderIndex] = updatedReminder;
-      } else {
-        reminders.splice(reminderIndex, 1);
-      }
-      await saveReminders();
-    }
-  });
+    ipcMain.on('hide-window', () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.hide();
+        }
+        isClosing = false;
+    });
 
-  ipcMain.on('remove-reminder', async (event, id) => {
-    const reminderIndex = reminders.findIndex(r => r.id === id);
-    if (reminderIndex !== -1) {
-      clearTimeout(reminders[reminderIndex].timeout);
-      reminders.splice(reminderIndex, 1);
-      await saveReminders();
-    }
-  });
+    ipcMain.on('close-app', closeApp);
+    ipcMain.on('open-external-link', (event, url) => {
+        shell.openExternal(url);
+        closeApp();
+    });
 
-  ipcMain.handle('get-reminders', () => {
-    return reminders.map(({ id, text, time }) => ({ id, text, time }));
-  });
+    ipcMain.handle('get-settings', async () => {
+        const loginSettings = app.getLoginItemSettings();
+        if (settings.openAtLogin !== loginSettings.openAtLogin) {
+            settings.openAtLogin = loginSettings.openAtLogin;
+            await saveSettings();
+        }
+        return settings;
+    });
 
-  ipcMain.handle('get-app-version', () => {
-    return app.getVersion();
-  });
+    ipcMain.on('set-setting', async (event, { key, value }) => {
+        if (key in settings) {
+            settings[key] = value;
+            if (key === 'openAtLogin') {
+                app.setLoginItemSettings({
+                    openAtLogin: value,
+                    args: ['--hidden']
+                });
+            }
+            if (key === 'isMovable') {
+                app.relaunch();
+                app.exit();
+            }
+            await saveSettings();
+        }
+    });
 
-  ipcMain.on('set-webview-visibility', (event, visible) => {
-    isWebViewVisible = visible;
-  });
+    ipcMain.on('set-custom-responses', async (event, responses) => {
+        if (Array.isArray(responses)) {
+            settings.customResponses = responses;
+            await saveSettings();
+        }
+    });
 
-  ipcMain.on('set-settings-visibility', (event, visible) => {
-    isSettingsVisible = visible;
-  });
+    ipcMain.handle('find-application', async (event, query) => {
+        const queryLower = query.toLowerCase();
+        const allApps = new Map();
 
-  mainWindow.loadFile('index.html');
-  mainWindow.on('ready-to-show', () => {
-    if (!isSilentStart) {
-      showWindow();
-    }
-  });
+        const startMenuFolders = [
+            path.join('C:', 'ProgramData', 'Microsoft', 'Windows', 'Start Menu', 'Programs'),
+            app.getPath('appData') ? path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs') : null
+        ].filter(Boolean);
+
+        for (const folder of startMenuFolders) {
+            const appsInFolder = await findApplicationsIn(folder);
+            for (const app of appsInFolder) {
+                if (!allApps.has(app.name)) {
+                    allApps.set(app.name, app.path);
+                }
+            }
+        }
+
+        const matchingApps = [];
+        for (const [name, path] of allApps.entries()) {
+            if (name.toLowerCase().includes(queryLower)) {
+                matchingApps.push({ name, path });
+            }
+        }
+        return matchingApps;
+    });
+
+    ipcMain.on('open-application-fallback', (event, appName) => {
+        const sanitizedAppName = appName.replace(/"/g, '');
+        exec(`start "" "${sanitizedAppName}"`, (error) => {
+            if (error) {
+                console.error(`Fallback failed to open app ${appName}:`, error);
+                mainWindow.webContents.send('command-failed', { command: 'open-application' });
+            }
+        });
+    });
+
+    ipcMain.on('open-path', (event, fsPath) => {
+        shell.openPath(fsPath).catch(err => {
+            console.error(`Failed to open path ${fsPath}:`, err);
+        });
+    });
+
+    ipcMain.on('set-reminder', async (event, { reminder, reminderTime }) => {
+        const newReminder = {
+            id: Date.now().toString(),
+            text: reminder,
+            time: reminderTime,
+            timeout: null
+        };
+        newReminder.timeout = scheduleReminder(newReminder);
+        if (newReminder.timeout) {
+            reminders.push(newReminder);
+            await saveReminders();
+        }
+    });
+
+    ipcMain.on('update-reminder', async (event, { id, reminder, reminderTime }) => {
+        const reminderIndex = reminders.findIndex(r => r.id === id);
+        if (reminderIndex !== -1) {
+            const existingReminder = reminders[reminderIndex];
+            clearTimeout(existingReminder.timeout);
+
+            const updatedReminder = {
+                ...existingReminder,
+                text: reminder,
+                time: reminderTime
+            };
+
+            updatedReminder.timeout = scheduleReminder(updatedReminder);
+            if (updatedReminder.timeout) {
+                reminders[reminderIndex] = updatedReminder;
+            } else {
+                reminders.splice(reminderIndex, 1);
+            }
+            await saveReminders();
+        }
+    });
+
+    ipcMain.on('remove-reminder', async (event, id) => {
+        const reminderIndex = reminders.findIndex(r => r.id === id);
+        if (reminderIndex !== -1) {
+            clearTimeout(reminders[reminderIndex].timeout);
+            reminders.splice(reminderIndex, 1);
+            await saveReminders();
+        }
+    });
+
+    ipcMain.handle('get-reminders', () => {
+        return reminders.map(({ id, text, time }) => ({ id, text, time }));
+    });
+
+    ipcMain.handle('get-app-version', () => {
+        return app.getVersion();
+    });
+
+    ipcMain.on('set-webview-visibility', (event, visible) => {
+        isWebViewVisible = visible;
+    });
+
+    ipcMain.on('set-settings-visibility', (event, visible) => {
+        isSettingsVisible = visible;
+    });
+
+    mainWindow.loadFile('index.html');
+    mainWindow.on('ready-to-show', () => {
+        if (!isSilentStart) {
+            showWindow();
+        }
+    });
 }
 
 app.on('window-all-closed', () => {
 });
 
 app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
-  }
+    if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+    }
 });

@@ -19,6 +19,10 @@ body {
     width: 100vw;
 }
 
+body.movable-mode {
+    background-color: #171717;
+}
+
 #app-container {
     position: absolute;
     bottom: 0;
@@ -28,6 +32,14 @@ body {
     opacity: 0;
     transform: translateY(100%);
     transition: transform 0.35s cubic-bezier(0.1, 0.9, 0.2, 1), opacity 0.35s cubic-bezier(0.1, 0.9, 0.2, 1);
+}
+
+body.movable-mode #app-container {
+    position: static;
+    height: 100vh;
+    width: 100vw;
+    opacity: 1;
+    transform: none;
 }
 
 #app-container.visible {
@@ -42,7 +54,12 @@ body {
     overflow: hidden;
 }
 
-#drag-bar, .settings-header {
+#drag-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 45px;
     -webkit-app-region: no-drag;
 }
 
@@ -54,15 +71,6 @@ body {
 #settings-btn,
 #settings-back-btn {
     -webkit-app-region: no-drag;
-}
-
-
-#drag-bar {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 45px;
 }
 
 #close-btn,
@@ -755,4 +763,13 @@ input:checked+.slider:before {
 
 .settings-button:hover {
     background-color: #444;
+}
+
+body.movable-mode #close-btn,
+body.movable-mode #drag-bar {
+    display: none;
+}
+
+body.movable-mode #settings-btn {
+    right: 0;
 }
