@@ -2,6 +2,7 @@ const { app, BrowserWindow, screen, ipcMain, shell, Notification, Tray, Menu } =
 const path = require('path');
 const { exec } = require('child_process');
 const fs = require('fs/promises');
+const cityTimezones = require('city-timezones');
 
 const APP_ID = 'com.blueysoft.cortana-electron';
 app.setAppUserModelId(APP_ID);
@@ -393,6 +394,40 @@ function createWindow() {
         isSettingsVisible = visible;
     });
 
+    ipcMain.handle('get-time-for-location', async (event, cityInput) => {
+        try {
+            const matches = cityTimezones.lookupViaCity(cityInput.trim());
+            if (!matches || matches.length === 0) {
+                throw new Error(`Could not find timezone for city: ${cityInput}`);
+            }
+
+            const timezone = matches[0].timezone;
+            const url = `https://timeapi.io/api/Time/current/zone?timeZone=${encodeURIComponent(timezone)}`;
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Time API returned status ${response.status}`);
+            }
+
+            const data = await response.json();
+            if (!data.dateTime) {
+                throw new Error("Missing dateTime in API response");
+            }
+
+            const dateTime = new Date(data.dateTime);
+            const formattedTime = dateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            return {
+                city: matches[0].city,
+                country: matches[0].country,
+                timeZone: timezone,
+                time: formattedTime,
+            };
+
+        } catch (error) {
+            throw error;
+        }
+    });
+  
     mainWindow.loadFile('index.html');
     mainWindow.on('ready-to-show', () => {
         if (!isSilentStart) {
@@ -400,12 +435,3 @@ function createWindow() {
         }
     });
 }
-
-app.on('window-all-closed', () => {
-});
-
-app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-        createWindow();
-    }
-});

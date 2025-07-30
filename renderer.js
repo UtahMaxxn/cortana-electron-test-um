@@ -685,25 +685,12 @@ async function getWeather(location) {
 async function getTimeForLocation(rawInput) {
     let text;
     try {
-        let timezonePath;
-        const lowerCaseInput = rawInput.trim().toLowerCase();
-
-        if (timeZoneAbbreviations[lowerCaseInput]) {
-            timezonePath = timeZoneAbbreviations[lowerCaseInput];
-        } else {
-            timezonePath = rawInput.trim().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('_');
-        }
-
-        const response = await fetch(`https://worldtimeapi.org/api/timezone/${timezonePath}`);
-        const data = await response.json();
-        if (!response.ok || data.error) throw new Error(data.error || 'Invalid timezone');
-        const dateTime = new Date(data.datetime);
-        const formattedTime = dateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const apiAbbreviation = data.abbreviation ? `(${data.abbreviation})` : '';
-        text = `The time in ${rawInput.trim()} ${apiAbbreviation} is ${formattedTime}.`;
+        const data = await ipcRenderer.invoke('get-time-for-location', rawInput.trim());
+        text = `The time in ${data.city}, ${data.country} (${data.timeZone}) is ${data.time}.`;
         displayAndSpeak(text, onActionFinished, { showWebLink: true }, false);
     } catch (error) {
         text = `Sorry, I couldn't find the time for '${rawInput.trim()}'.`;
+        alert(error.message || error);
         displayAndSpeak(text, onActionFinished, { showWebLink: true }, true);
     }
 }
