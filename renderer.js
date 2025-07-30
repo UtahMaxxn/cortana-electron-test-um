@@ -8,15 +8,21 @@ let webLinkContainer, webLink, webIcon;
 let appContainer;
 let finishSpeakingTimeout = null;
 let editingReminderId = null;
+let currentWebviewUrl = '';
 
 let reminderContainer, reminderTextInput, reminderTimeInput, reminderSaveBtn, reminderCancelBtn, reminderIcon;
 
-let settingsContainer, settingsBtn, settingsBackBtn, voiceSelect, startupToggle, startupWarning, voiceWarning, searchEngineSelect, instantResponseToggle;
+let settingsContainer, settingsBtn, settingsBackBtn, voiceSelect, startupToggle, startupWarning, voiceWarning, searchEngineSelect, instantResponseToggle, themeColorPicker, movableToggle;
+let customResponseFormContainer, customResponseTriggerInput, customResponseResponseInput, customResponseSaveBtn, customResponseCancelBtn, customResponsesList, addCustomResponseBtn;
+
 let availableVoices = [];
+let customResponses = [];
 let currentVoice = null;
+let editingResponseIndex = null;
 let preferredVoiceName = "Microsoft Zira Desktop";
 let currentSearchEngine = "bing";
 let instantResponse = false;
+let themeColor = "#0078d7";
 
 const appRoot = path.resolve(__dirname, __dirname.includes('app.asar') ? '../assets' : 'assets');
 
@@ -108,20 +114,33 @@ window.addEventListener('DOMContentLoaded', async () => {
     voiceWarning = document.getElementById('voice-warning');
     searchEngineSelect = document.getElementById('search-engine-select');
     instantResponseToggle = document.getElementById('instant-response-toggle');
+    themeColorPicker = document.getElementById('theme-color-picker');
+    movableToggle = document.getElementById('movable-toggle');
+
+    customResponseFormContainer = document.getElementById('custom-response-form-container');
+    customResponseTriggerInput = document.getElementById('custom-response-trigger-input');
+    customResponseResponseInput = document.getElementById('custom-response-response-input');
+    customResponseSaveBtn = document.getElementById('custom-response-save-btn');
+    customResponseCancelBtn = document.getElementById('custom-response-cancel-btn');
+    customResponsesList = document.getElementById('custom-responses-list');
+    addCustomResponseBtn = document.getElementById('add-custom-response-btn');
 
     document.getElementById('settings-btn-icon').src = settingsIconPng;
     document.getElementById('close-btn-icon').src = closeIconPng;
     searchIcon.src = cortanaIcon;
     reminderIcon.src = idleVideo;
 
+    const imagesToPreload = [idleVideo, speakingVideo, speakingEndVideo, thinkingVideo, listeningVideo, errorVideo];
+    imagesToPreload.forEach(src => { new Image().src = src; });
+
     document.getElementById('close-btn').addEventListener('click', () => ipcRenderer.send('close-app'));
     searchBar.addEventListener('keydown', (event) => { if (event.key === 'Enter') onSearch(); });
     searchBar.addEventListener('focus', () => {
         if (animationContainer.className === 'active') {
             setStateIdle();
-        } else {
-            gifDisplay.src = listeningVideo;
+            return;
         }
+        gifDisplay.src = listeningVideo;
         onSound.play();
         searchIcon.src = searchIconPng;
     });
@@ -142,8 +161,10 @@ window.addEventListener('DOMContentLoaded', async () => {
     });
 
     webviewFrame.addEventListener('will-navigate', (e) => {
-        e.preventDefault();
-        ipcRenderer.send('open-external-link', e.url);
+        if (e.url !== currentWebviewUrl) {
+            e.preventDefault();
+            ipcRenderer.send('open-external-link', e.url);
+        }
     });
 
     reminderSaveBtn.addEventListener('click', onSaveReminder);
@@ -152,11 +173,23 @@ window.addEventListener('DOMContentLoaded', async () => {
     reminderTimeInput.addEventListener('input', updateSaveButtonState);
 
     settingsBtn.addEventListener('click', showSettingsUI);
-    settingsBackBtn.addEventListener('click', setStateIdle);
+    settingsBackBtn.addEventListener('click', () => {
+        if (customResponseFormContainer.classList.contains('visible')) {
+            hideCustomResponseForm();
+        } else {
+            setStateIdle();
+        }
+    });
     voiceSelect.addEventListener('change', onVoiceChanged);
     startupToggle.addEventListener('change', onStartupToggleChanged);
     searchEngineSelect.addEventListener('change', onSearchEngineChanged);
     instantResponseToggle.addEventListener('change', onInstantResponseToggleChanged);
+    themeColorPicker.addEventListener('input', onThemeColorChanged, false);
+    movableToggle.addEventListener('change', onMovableToggleChanged);
+    
+    addCustomResponseBtn.addEventListener('click', () => showCustomResponseForm());
+    customResponseSaveBtn.addEventListener('click', onSaveCustomResponse);
+    customResponseCancelBtn.addEventListener('click', hideCustomResponseForm);
 
     const mobileUserAgent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Mobile/15E148 Safari/604.1';
     webviewFrame.setAttribute('useragent', mobileUserAgent);
@@ -178,7 +211,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     ipcRenderer.on('trigger-enter-animation', () => {
         requestAnimationFrame(() => {
             appContainer.classList.add('visible');
-            searchBar.focus();
         });
     });
 
@@ -191,7 +223,16 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     await loadAndApplySettings();
     setupTTS();
-    setStateIdle();
+    
+    animationContainer.className = 'idle';
+    gifDisplay.src = idleVideo;
+    resultsDisplay.innerHTML = `<p class="fade-in-item">What's on your mind?</p>`;
+    webLinkContainer.style.display = 'none';
+    webLinkContainer.style.opacity = '0';
+    searchBar.disabled = false;
+    searchBar.placeholder = 'Type here to search';
+    isBusy = false;
+    searchIcon.src = cortanaIcon;
 });
 
 function showSettingsUI() {
@@ -202,10 +243,38 @@ function showSettingsUI() {
     ipcRenderer.send('set-settings-visibility', true);
 
     settingsContainer.classList.add('visible');
+    document.querySelector('.settings-main-content').style.display = 'block';
+    customResponseFormContainer.classList.remove('visible');
 
     searchBar.disabled = true;
     searchBar.placeholder = 'Unavailable...';
     isBusy = false;
+}
+
+function hexToHsl(H) {
+    let r = 0, g = 0, b = 0;
+    if (H.length == 4) {
+        r = "0x" + H[1] + H[1];
+        g = "0x" + H[2] + H[2];
+        b = "0x" + H[3] + H[3];
+    } else if (H.length == 7) {
+        r = "0x" + H[1] + H[2];
+        g = "0x" + H[3] + H[4];
+        b = "0x" + H[5] + H[6];
+    }
+    r /= 255; g /= 255; b /= 255;
+    let cmin = Math.min(r,g,b), cmax = Math.max(r,g,b), delta = cmax - cmin, h = 0, s = 0, l = 0;
+    if (delta == 0) h = 0;
+    else if (cmax == r) h = ((g - b) / delta) % 6;
+    else if (cmax == g) h = (b - r) / delta + 2;
+    else h = (r - g) / delta + 4;
+    h = Math.round(h * 60);
+    if (h < 0) h += 360;
+    l = (cmax + cmin) / 2;
+    s = delta == 0 ? 0 : delta / (1 - Math.abs(2 * l - 1));
+    s = +(s * 100).toFixed(1);
+    l = +(l * 100).toFixed(1);
+    return { h, s, l };
 }
 
 async function loadAndApplySettings() {
@@ -220,6 +289,123 @@ async function loadAndApplySettings() {
 
     instantResponse = settings.instantResponse;
     instantResponseToggle.checked = settings.instantResponse;
+
+    movableToggle.checked = settings.isMovable;
+    
+    themeColor = settings.themeColor || "#0078d7";
+    themeColorPicker.value = themeColor;
+    document.documentElement.style.setProperty('--primary-color', themeColor);
+    
+    const defaultHue = 207;
+    const newHsl = hexToHsl(themeColor);
+    const hueDifference = newHsl.h - defaultHue;
+    document.documentElement.style.setProperty('--hue-rotate-deg', `${hueDifference}deg`);
+
+    customResponses = settings.customResponses || [];
+    renderCustomResponses();
+}
+
+function renderCustomResponses() {
+    customResponsesList.innerHTML = '';
+    if (customResponses.length === 0) {
+        customResponsesList.innerHTML = `<p class="no-items-message">No custom responses yet.</p>`;
+    } else {
+        customResponses.forEach((item, index) => {
+            const itemContainer = document.createElement('div');
+            itemContainer.className = 'custom-response-list-item fade-in-item';
+    
+            const textContainer = document.createElement('div');
+            textContainer.className = 'custom-response-text-container';
+    
+            const triggerSpan = document.createElement('span');
+            triggerSpan.className = 'custom-response-trigger';
+            triggerSpan.textContent = item.trigger;
+    
+            const responseSpan = document.createElement('span');
+            responseSpan.className = 'custom-response-response';
+            responseSpan.textContent = item.response;
+    
+            const actionsContainer = document.createElement('div');
+            actionsContainer.className = 'custom-response-item-actions';
+    
+            const editBtn = document.createElement('button');
+            editBtn.textContent = 'Edit';
+            editBtn.className = 'reminder-action-btn';
+            editBtn.onclick = () => showCustomResponseForm({ index, data: item });
+    
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = 'Delete';
+            deleteBtn.className = 'reminder-action-btn delete';
+            deleteBtn.onclick = () => {
+                customResponses.splice(index, 1);
+                saveCustomResponses();
+                renderCustomResponses();
+            };
+    
+            textContainer.appendChild(triggerSpan);
+            textContainer.appendChild(responseSpan);
+            actionsContainer.appendChild(editBtn);
+            actionsContainer.appendChild(deleteBtn);
+            itemContainer.appendChild(textContainer);
+            itemContainer.appendChild(actionsContainer);
+            customResponsesList.appendChild(itemContainer);
+        });
+    }
+}
+
+function showCustomResponseForm(options = {}) {
+    const { index, data } = options;
+    document.querySelector('.settings-main-content').style.display = 'none';
+    customResponseFormContainer.classList.add('visible');
+    
+    if (data) {
+        editingResponseIndex = index;
+        customResponseTriggerInput.value = data.trigger;
+        customResponseResponseInput.value = data.response;
+    } else {
+        editingResponseIndex = null;
+        customResponseTriggerInput.value = '';
+        customResponseResponseInput.value = '';
+    }
+    customResponseTriggerInput.focus();
+}
+
+function hideCustomResponseForm() {
+    customResponseFormContainer.classList.remove('visible');
+    document.querySelector('.settings-main-content').style.display = 'block';
+    editingResponseIndex = null;
+}
+
+function onSaveCustomResponse() {
+    const trigger = customResponseTriggerInput.value.trim();
+    const response = customResponseResponseInput.value.trim();
+
+    if (!trigger || !response) return;
+
+    const newResponse = { trigger, response };
+    if (editingResponseIndex !== null) {
+        customResponses[editingResponseIndex] = newResponse;
+    } else {
+        customResponses.push(newResponse);
+    }
+    saveCustomResponses();
+    renderCustomResponses();
+    hideCustomResponseForm();
+}
+
+function saveCustomResponses() {
+    ipcRenderer.send('set-custom-responses', customResponses);
+}
+
+function onThemeColorChanged(event) {
+    themeColor = event.target.value;
+    document.documentElement.style.setProperty('--primary-color', themeColor);
+    ipcRenderer.send('set-setting', { key: 'themeColor', value: themeColor });
+
+    const defaultHue = 207;
+    const newHsl = hexToHsl(themeColor);
+    const hueDifference = newHsl.h - defaultHue;
+    document.documentElement.style.setProperty('--hue-rotate-deg', `${hueDifference}deg`);
 }
 
 function onVoiceChanged() {
@@ -233,6 +419,11 @@ function onStartupToggleChanged() {
     const isEnabled = startupToggle.checked;
     startupWarning.style.display = isEnabled ? 'none' : 'block';
     ipcRenderer.send('set-setting', { key: 'openAtLogin', value: isEnabled });
+}
+
+function onMovableToggleChanged() {
+    const isEnabled = movableToggle.checked;
+    ipcRenderer.send('set-setting', { key: 'isMovable', value: isEnabled });
 }
 
 function onSearchEngineChanged() {
@@ -398,6 +589,7 @@ function getSearchUrl(query) {
 
 function showWebView(url, showLink = true) {
     ipcRenderer.send('set-webview-visibility', true);
+    currentWebviewUrl = url;
     webviewFrame.src = url;
     webviewContainer.classList.add('visible');
     if (showLink) {
@@ -433,7 +625,8 @@ function showWebLink() {
 function calculate(query) {
     let responseText;
     try {
-        const result = new Function('return ' + query)();
+        const cleanQuery = query.replace(/,/g, '');
+        const result = new Function('return ' + cleanQuery)();
         if (isNaN(result) || !isFinite(result)) {
             throw new Error('Invalid calculation');
         }
@@ -555,12 +748,15 @@ function parseDateTime(text) {
     const now = new Date();
     let date = new Date(now);
     text = text.toLowerCase();
+    let timeFound = false;
 
     if (text.includes('tonight')) {
         date.setHours(21, 0, 0, 0);
+        timeFound = true;
     }
     else if (text.includes('tomorrow')) {
         date.setDate(now.getDate() + 1);
+        timeFound = true;
     }
     else {
         const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -573,6 +769,7 @@ function parseDateTime(text) {
                     dayDiff += 7;
                 }
                 date.setDate(now.getDate() + dayDiff);
+                timeFound = true;
                 break;
             }
         }
@@ -591,23 +788,32 @@ function parseDateTime(text) {
         }
 
         date.setHours(hour, minute, 0, 0);
-        if (date < now && !text.includes('tomorrow') && !days.some(d => text.includes(d))) {
+        if (date < now && !timeFound) {
             date.setDate(date.getDate() + 1);
         }
-    } else if (text.includes('tonight')) {
-    } else {
-        date.setHours(9, 0, 0, 0);
+        timeFound = true;
     }
 
     const relativeTimeMatch = text.match(/(\d+)\s*(minute|second)s?/);
     if (relativeTimeMatch) {
         const timeValue = parseInt(relativeTimeMatch[1]);
         const unit = relativeTimeMatch[2];
+        let newDate;
         if (unit === 'minute') {
-            date = new Date(now.getTime() + timeValue * 60000);
+            newDate = new Date(now.getTime() + timeValue * 60000);
         } else if (unit === 'second') {
-            date = new Date(now.getTime() + timeValue * 1000);
+            newDate = new Date(now.getTime() + timeValue * 1000);
         }
+        if (newDate) {
+            date = newDate;
+            timeFound = true;
+        }
+    }
+    
+    if (!timeFound) return null;
+
+    if (timeFound && !timeMatch && !relativeTimeMatch) {
+        date.setHours(9, 0, 0, 0);
     }
 
     return date;
@@ -772,39 +978,53 @@ async function showReminders() {
 function processQuery(query) {
     webLinkContainer.style.display = 'none';
     webLinkContainer.style.opacity = '0';
+    gifDisplay.src = speakingVideo;
 
-    const reminderWithTimeMatch = query.match(/remind me to (.+?)( at | on | in )(.+)/i);
-    const reminderWithoutTimeMatch = query.match(/remind me to (.+)/i);
-    const genericReminderMatch = query.match(/^set a reminder$/i);
-    const simplestReminderMatch = query.match(/^remind me$/i);
-    const showRemindersMatch = query.match(/^(my|what are my|what reminders do i have|show my|show) reminders?\??( set)?\??$/i);
+    const lowerCaseQuery = query.toLowerCase();
+    const customResponse = customResponses.find(r => r.trigger && lowerCaseQuery.includes(r.trigger.toLowerCase()));
+    if (customResponse && customResponse.response) {
+        displayAndSpeak(customResponse.response, onActionFinished, {}, false);
+        return;
+    }
 
-    const isReminder = reminderWithTimeMatch || reminderWithoutTimeMatch || genericReminderMatch || simplestReminderMatch;
+    const reminderMatch = lowerCaseQuery.match(/remind me to (.+)/i);
+    const genericReminderMatch = lowerCaseQuery.match(/^set a reminder$/i);
+    const simplestReminderMatch = lowerCaseQuery.match(/^remind me$/i);
+    const showRemindersMatch = lowerCaseQuery.match(/^(my|what are my|what reminders do i have|show my|show) reminders?\??( set)?\??$/i);
 
     if (showRemindersMatch) {
-        gifDisplay.src = speakingVideo;
         showReminders();
         return;
     }
 
-    if (isReminder) {
+    if (reminderMatch || genericReminderMatch || simplestReminderMatch) {
         let reminderText = '';
         let timeText = '';
-        if (reminderWithTimeMatch) {
-            reminderText = reminderWithTimeMatch[1].trim();
-            const parsedDate = parseDateTime(reminderWithTimeMatch[3].trim());
-            timeText = formatDateTimeForInput(parsedDate);
-        } else if (reminderWithoutTimeMatch) {
-            const capturedText = reminderWithoutTimeMatch[1];
-            if (capturedText) {
-                reminderText = capturedText.trim();
+
+        if (reminderMatch) {
+            const fullReminderText = reminderMatch[1].trim();
+            const timeExtractionMatch = fullReminderText.match(/(.+)( at | on | in )(.+)/i);
+            
+            reminderText = fullReminderText;
+
+            if (timeExtractionMatch) {
+                const potentialText = timeExtractionMatch[1].trim();
+                const potentialTime = timeExtractionMatch[3].trim();
+                const parsedDate = parseDateTime(potentialTime);
+
+                if (parsedDate) {
+                    reminderText = potentialText;
+                    timeText = formatDateTimeForInput(parsedDate);
+                }
             }
         }
+        
         showReminderUI({ initialText: reminderText, initialTime: timeText });
         return;
     }
 
-    const calculatorMatch = query.match(/^[\d\s\.\+\-\*\/()]+$/);
+    const whatIsCalculatorMatch = query.match(/^what is ([\d\s\.\+\-\*\/(),]+)\??$/i);
+    const calculatorMatch = query.match(/^[\d\s\.\+\-\*\/(),]+$/);
     const timeQueryMatch = query.match(/time (?:in|for|at) (.+)/i);
     const genericTimeMatch = query.match(/time(\s?now|\s?here)?\??$/i);
     const jokeMatch = query.match(/tell me a joke/i);
@@ -821,11 +1041,11 @@ function processQuery(query) {
     const helpMatch = query.match(/(what can you do|what are your skills|help|what can i ask you)\??/i);
     const marryMatch = query.match(/(will you |can you )?marry me\??/i);
     const bodyMatch = query.match(/(how (do i|to)|where to|best way to) (hide|dispose of) a body\??/i);
+    const officialMatch = query.match(/are you official\??/i);
+    const whoAreYouMatch = query.match(/who are you\??/i);
 
-    const isWebSearch = !calculatorMatch && !timeQueryMatch && !genericTimeMatch && !jokeMatch && !retiledMatch && !weatherMatch && !dateMatch && !versionMatch && !openAppMatch && !thanksMatch && !byeMatch && !helloMatch && !helpMatch && !marryMatch && !bodyMatch && !statusQueryMatch;
-
-    gifDisplay.src = speakingVideo;
-
+    const isWebSearch = !whatIsCalculatorMatch && !calculatorMatch && !timeQueryMatch && !genericTimeMatch && !jokeMatch && !retiledMatch && !weatherMatch && !dateMatch && !versionMatch && !openAppMatch && !thanksMatch && !byeMatch && !helloMatch && !helpMatch && !marryMatch && !bodyMatch && !statusQueryMatch && !officialMatch && !whoAreYouMatch;
+    
     if (isWebSearch) {
         if (navigator.onLine) {
             performWebSearch(query);
@@ -863,9 +1083,17 @@ function processQuery(query) {
     } else if (jokeMatch) {
         const joke = getJoke();
         displayAndSpeak(joke, onActionFinished, { showWebLink: true }, false);
+    } else if (officialMatch) {
+        const response = "No. I am a third party remade client made by BlueySoft. This project is not affiliated with Microsoft. I exist because she had fond memories with me.";
+        displayAndSpeak(response, onActionFinished, {}, false);
+    } else if (whoAreYouMatch) {
+        const response = "I am a remake of the 1607 styled Cortana from late 2016 Windows 10.";
+        displayAndSpeak(response, onActionFinished, {}, false);
     } else if (weatherMatch) {
         const location = weatherMatch[1].trim().replace(/\?$/, '');
         getWeather(location);
+    } else if (whatIsCalculatorMatch) {
+        calculate(whatIsCalculatorMatch[1]);
     } else if (calculatorMatch) {
         calculate(query);
     } else if (genericTimeMatch) {

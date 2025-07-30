@@ -1,3 +1,9 @@
+:root {
+    --primary-color: #0078d7;
+    --primary-text-color: white;
+    --hue-rotate-deg: 0deg;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -36,6 +42,15 @@ body {
     overflow: hidden;
 }
 
+#drag-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 45px;
+    -webkit-app-region: drag;
+}
+
 #close-btn,
 #settings-btn {
     position: absolute;
@@ -48,6 +63,7 @@ body {
     background-color: transparent;
     cursor: pointer;
     z-index: 10;
+    -webkit-app-region: no-drag;
 }
 
 #close-btn {
@@ -113,6 +129,7 @@ body {
     left: 50%;
     transform: translateX(-50%);
     transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    filter: hue-rotate(var(--hue-rotate-deg));
 }
 
 #content-wrapper {
@@ -125,7 +142,7 @@ body {
 }
 
 #results-display {
-    color: #0078d7;
+    color: var(--primary-color);
     font-size: 22px;
     display: flex;
     flex-direction: column;
@@ -182,8 +199,9 @@ body {
 }
 
 .choice-button:hover {
-    background-color: #2691d9;
-    border-color: #2691d9;
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    color: var(--primary-text-color);
 }
 
 #animation-container.idle #gif-display {
@@ -303,7 +321,6 @@ body {
 #search-bar:hover {
     border: 2px solid #4c4c4c;
     background-color: #4c4c4c;
-    color: #8a7e6a;
 }
 
 .search-container:hover #search-icon {
@@ -321,11 +338,12 @@ body {
 }
 
 #search-bar::placeholder {
-    color: #74776f;
+    color: #a2a2a2;
     opacity: 1;
 }
 
-#reminder-container {
+#reminder-container,
+#custom-response-form-container {
     position: absolute;
     top: 0;
     left: 0;
@@ -340,7 +358,8 @@ body {
     z-index: 5;
 }
 
-#reminder-container.visible {
+#reminder-container.visible,
+#custom-response-form-container.visible {
     display: flex;
     animation: fadeIn 0.3s ease-in-out forwards;
 }
@@ -349,11 +368,12 @@ body {
     width: 48px;
     height: 48px;
     margin-bottom: 20px;
+    filter: hue-rotate(var(--hue-rotate-deg));
 }
 
 .reminder-title {
     font-size: 22px;
-    color: #0078d7;
+    color: var(--primary-color);
     margin-bottom: 25px;
     font-weight: 300;
 }
@@ -370,10 +390,12 @@ body {
 }
 
 #reminder-text-input,
-#reminder-time-input {
+#reminder-time-input,
+#custom-response-trigger-input,
+#custom-response-response-input {
     width: 100%;
     background-color: transparent;
-    border: 1px solid #0078d7;
+    border: 1px solid var(--primary-color);
     color: white;
     font-size: 18px;
     padding: 10px 12px;
@@ -383,7 +405,9 @@ body {
 }
 
 #reminder-text-input::placeholder,
-#reminder-time-input::placeholder {
+#reminder-time-input::placeholder,
+#custom-response-trigger-input::placeholder,
+#custom-response-response-input::placeholder {
     color: #74776f;
 }
 
@@ -412,11 +436,14 @@ body {
     filter: brightness(1.2);
 }
 
-#reminder-save-btn {
-    background-color: #0078d7;
+#reminder-save-btn,
+#custom-response-save-btn {
+    background-color: var(--primary-color);
+    color: var(--primary-text-color);
 }
 
-#reminder-cancel-btn {
+#reminder-cancel-btn,
+#custom-response-cancel-btn {
     background-color: #5a5a5a;
 }
 
@@ -440,9 +467,18 @@ body {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    margin-bottom: 15px;
 }
 
-.reminder-list-item {
+.no-items-message {
+    font-size: 14px;
+    color: #a2a2a2;
+    text-align: center;
+    padding: 10px 0;
+}
+
+.reminder-list-item,
+.custom-response-list-item {
     background-color: #2a2a2a;
     width: 100%;
     padding: 12px 15px;
@@ -453,7 +489,8 @@ body {
     text-align: left;
 }
 
-.reminder-text-container {
+.reminder-text-container,
+.custom-response-text-container {
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -461,19 +498,26 @@ body {
     margin-right: 10px;
 }
 
-.reminder-text {
+.reminder-text,
+.custom-response-trigger {
     font-size: 15px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: bold;
+}
+
+.reminder-time,
+.custom-response-response {
+    font-size: 12px;
+    color: #a2a2a2;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.reminder-time {
-    font-size: 12px;
-    color: #a2a2a2;
-}
-
-.reminder-item-actions {
+.reminder-item-actions,
+.custom-response-item-actions {
     display: flex;
     gap: 8px;
     flex-shrink: 0;
@@ -533,10 +577,11 @@ body {
     font-size: 24px;
     cursor: pointer;
     padding: 5px 15px 5px 5px;
+    -webkit-app-region: no-drag;
 }
 
 #settings-back-btn:hover {
-    color: #0078d7;
+    color: var(--primary-color);
 }
 
 .settings-header h1 {
@@ -548,11 +593,25 @@ body {
     padding: 20px 30px;
     overflow-y: auto;
     flex-grow: 1;
+    position: relative;
+}
+
+.settings-main-content {
+    display: block;
+}
+
+#custom-response-form-container {
+    display: none;
+    position: absolute;
+    top: 45px;
+    left: 0;
+    height: calc(100% - 45px);
+    z-index: 25;
 }
 
 .settings-section h2 {
     font-size: 14px;
-    color: #0078d7;
+    color: var(--primary-color);
     text-transform: uppercase;
     font-weight: normal;
     margin-bottom: 20px;
@@ -582,20 +641,31 @@ body {
     border-radius: 0;
 }
 
+#theme-color-picker {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    width: 44px;
+    height: 28px;
+    background-color: transparent;
+    border: none;
+    cursor: pointer;
+}
+#theme-color-picker::-webkit-color-swatch {
+    border-radius: 4px;
+    border: 1px solid #555;
+}
+#theme-color-picker::-moz-color-swatch {
+    border-radius: 4px;
+    border: 1px solid #555;
+}
+
 .setting-warning {
     font-size: 12px;
     color: #a2a2a2;
     display: none;
-}
-
-#startup-warning {
     margin-top: -10px;
-    margin-bottom: 10px;
-}
-
-#voice-warning {
-    margin-top: -15px;
-    padding-bottom: 15px;
+    padding-bottom: 10px;
 }
 
 .toggle-switch {
@@ -634,7 +704,7 @@ body {
 }
 
 input:checked+.slider {
-    background-color: #0078d7;
+    background-color: var(--primary-color);
 }
 
 input:checked+.slider:before {
@@ -647,4 +717,18 @@ input:checked+.slider:before {
 
 .slider.round:before {
     border-radius: 50%;
+}
+
+.settings-button {
+    width: 100%;
+    padding: 10px;
+    background-color: #333;
+    border: 1px solid #555;
+    color: white;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.settings-button:hover {
+    background-color: #444;
 }

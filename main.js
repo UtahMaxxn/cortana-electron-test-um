@@ -20,7 +20,10 @@ let settings = {
   openAtLogin: true,
   preferredVoice: "Microsoft Zira Desktop",
   searchEngine: "bing",
-  instantResponse: false
+  instantResponse: false,
+  themeColor: "#0078d7",
+  customResponses: [],
+  isMovable: false
 };
 const SETTINGS_FILE = path.join(app.getPath('userData'), 'settings.json');
 const REMINDERS_FILE = path.join(app.getPath('userData'), 'reminders.json');
@@ -126,7 +129,9 @@ function showWindow() {
       const point = screen.getCursorScreenPoint();
       const display = screen.getDisplayNearestPoint(point);
       const { x, height: screenHeight } = display.workArea;
-      mainWindow.setPosition(x, screenHeight - winHeight);
+      if (!settings.isMovable) {
+          mainWindow.setPosition(x, screenHeight - winHeight);
+      }
     }
     isClosing = false;
     mainWindow.show();
@@ -171,6 +176,7 @@ function createWindow() {
     alwaysOnTop: true,
     focusable: true,
     show: false,
+    movable: settings.isMovable,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -249,8 +255,25 @@ function createWindow() {
                   args: ['--hidden']
               });
           }
+          if (key === 'isMovable') {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.setMovable(value);
+                if (!value) {
+                    const display = screen.getDisplayMatching(mainWindow.getBounds());
+                    const { x, height: screenHeight } = display.workArea;
+                    mainWindow.setPosition(x, screenHeight - winHeight);
+                }
+            }
+          }
           await saveSettings();
       }
+  });
+
+  ipcMain.on('set-custom-responses', async (event, responses) => {
+    if (Array.isArray(responses)) {
+        settings.customResponses = responses;
+        await saveSettings();
+    }
   });
 
   ipcMain.handle('find-application', async (event, query) => {

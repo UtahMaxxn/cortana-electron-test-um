@@ -8,6 +8,7 @@
 <body>
     <div id="app-container">
         <div class="main-container">
+            <div id="drag-bar"></div>
             <div id="settings-btn" title="Settings">
                 <img id="settings-btn-icon" alt="Settings Icon">
             </div>
@@ -48,40 +49,71 @@
                         <h1>Settings</h1>
                     </div>
                     <div class="settings-content">
-                        <div class="settings-section">
-                            <h2>Personalisation</h2>
-                            <div class="setting-item">
-                                <label for="voice-select">Voice</label>
-                                <select id="voice-select"></select>
+                        <div class="settings-main-content">
+                            <div class="settings-section">
+                                <h2>Personalisation</h2>
+                                <div class="setting-item">
+                                    <label for="voice-select">Voice</label>
+                                    <select id="voice-select"></select>
+                                </div>
+                                <div class="setting-item">
+                                    <label for="theme-color-picker">Theme Colour</label>
+                                    <input type="color" id="theme-color-picker" value="#0078d7">
+                                </div>
+                                <p id="voice-warning" class="setting-warning">Cortana's default voice (Microsoft Zira Desktop) is not available.</p>
                             </div>
-                            <p id="voice-warning" class="setting-warning">Cortana's default voice (Microsoft Zira Desktop) is not available.</p>
+                            <div class="settings-section">
+                                <h2>Custom Responses</h2>
+                                <div id="custom-responses-list" class="reminder-list"></div>
+                                <button id="add-custom-response-btn" class="settings-button">Add New Response</button>
+                            </div>
+                            <div class="settings-section">
+                                <h2>Search</h2>
+                                <div class="setting-item">
+                                    <label for="search-engine-select">Search Engine</label>
+                                    <select id="search-engine-select">
+                                        <option value="bing">Bing</option>
+                                        <option value="duckduckgo">DuckDuckGo</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="settings-section">
+                                <h2>System</h2>
+                                <div class="setting-item">
+                                    <label for="startup-toggle">Start with Windows</label>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="startup-toggle">
+                                        <span class="slider round"></span>
+                                    </label>
+                                </div>
+                                <p id="startup-warning" class="setting-warning">Reminders may not work as expected until Cortana is launched manually.</p>
+                                <div class="setting-item">
+                                    <label for="movable-toggle">Movable Window</label>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="movable-toggle">
+                                        <span class="slider round"></span>
+                                    </label>
+                                </div>
+                                <div class="setting-item">
+                                    <label for="instant-response-toggle">Instant Response</label>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="instant-response-toggle">
+                                        <span class="slider round"></span>
+                                    </label>
+                                </div>
+                            </div>
                         </div>
-                        <div class="settings-section">
-                            <h2>Search</h2>
-                            <div class="setting-item">
-                                <label for="search-engine-select">Search Engine</label>
-                                <select id="search-engine-select">
-                                    <option value="bing">Bing</option>
-                                    <option value="duckduckgo">DuckDuckGo</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="settings-section">
-                            <h2>System</h2>
-                            <div class="setting-item">
-                                <label for="startup-toggle-label">Start with Windows</label>
-                                <label class="toggle-switch">
-                                    <input type="checkbox" id="startup-toggle">
-                                    <span class="slider round"></span>
-                                </label>
-                            </div>
-                             <p id="startup-warning" class="setting-warning">Reminders may not work as expected until Cortana is launched manually.</p>
-                             <div class="setting-item">
-                                <label for="instant-response-toggle-label">Instant Response</label>
-                                <label class="toggle-switch">
-                                    <input type="checkbox" id="instant-response-toggle">
-                                    <span class="slider round"></span>
-                                </label>
+                        <div id="custom-response-form-container">
+                            <p class="reminder-title">Custom Response</p>
+                             <div class="reminder-form">
+                                <label for="custom-response-trigger-input" class="reminder-label-gray">When I say...</label>
+                                <input type="text" id="custom-response-trigger-input" placeholder="e.g., who made you?">
+                                <label for="custom-response-response-input" class="reminder-label-gray">You say...</label>
+                                <input type="text" id="custom-response-response-input" placeholder="e.g., I was made by BlueySoft">
+                                <div class="reminder-actions">
+                                    <button id="custom-response-save-btn">Save</button>
+                                    <button id="custom-response-cancel-btn">Cancel</button>
+                                </div>
                             </div>
                         </div>
                     </div>
