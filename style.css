@@ -42,13 +42,27 @@ body {
     overflow: hidden;
 }
 
+#drag-bar, .settings-header {
+    -webkit-app-region: no-drag;
+}
+
+.is-draggable {
+    -webkit-app-region: drag;
+}
+
+#close-btn,
+#settings-btn,
+#settings-back-btn {
+    -webkit-app-region: no-drag;
+}
+
+
 #drag-bar {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 45px;
-    -webkit-app-region: drag;
 }
 
 #close-btn,
@@ -63,7 +77,6 @@ body {
     background-color: transparent;
     cursor: pointer;
     z-index: 10;
-    -webkit-app-region: no-drag;
 }
 
 #close-btn {
@@ -565,9 +578,9 @@ body {
 .settings-header {
     display: flex;
     align-items: center;
-    padding: 0 10px;
     height: 45px;
     flex-shrink: 0;
+    padding: 0;
 }
 
 #settings-back-btn {
@@ -576,8 +589,8 @@ body {
     color: white;
     font-size: 24px;
     cursor: pointer;
-    padding: 5px 15px 5px 5px;
-    -webkit-app-region: no-drag;
+    padding: 5px 15px;
+    flex-shrink: 0;
 }
 
 #settings-back-btn:hover {
@@ -587,6 +600,13 @@ body {
 .settings-header h1 {
     font-size: 20px;
     font-weight: 300;
+    flex-grow: 1;
+    height: 100%;
+    line-height: 45px;
+    padding: 0 10px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 
 .settings-content {
@@ -594,6 +614,10 @@ body {
     overflow-y: auto;
     flex-grow: 1;
     position: relative;
+}
+
+.settings-content::-webkit-scrollbar {
+    display: none;
 }
 
 .settings-main-content {

@@ -1,6 +1,8 @@
 # Electron Cortana, or... Cortana Electron!
 A custom, local Cortana client built with Electron, inspired by the classic design and functionality of Microsoft's original assistant.
 
+We are not affiliated with Microsoft! We do not own the licenses for Cortana. This is just a faithful recreation project.
+
 ### About The Project
 
 As a kid, my Nana got me into tech. What was one thing she let me do? Talk to Cortana. She had a whole Microphone setup for Cortana. I miss those days, and I want Cortana back. (I love you Nana!)
