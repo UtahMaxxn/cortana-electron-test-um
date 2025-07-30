@@ -20,10 +20,13 @@ let instantResponse = false;
 
 const appRoot = path.resolve(__dirname, __dirname.includes('app.asar') ? '../assets' : 'assets');
 
-const idleGif = path.join(appRoot, 'idle.gif');
-const speakingGif = path.join(appRoot, 'speaking.gif');
-const speakingEndGif = path.join(appRoot, 'speaking-end.gif');
-const thinkingGif = path.join(appRoot, 'thinking.gif');
+const idleVideo = path.join(appRoot, 'idle.png');
+const speakingVideo = path.join(appRoot, 'speaking.png');
+const speakingEndVideo = path.join(appRoot, 'speaking-end.png');
+const thinkingVideo = path.join(appRoot, 'thinking.png');
+const listeningVideo = path.join(appRoot, 'listening.png');
+const errorVideo = path.join(appRoot, 'error.png');
+
 const cortanaIcon = path.join(appRoot, 'cortana.png');
 const searchIconPng = path.join(appRoot, 'search.png');
 const settingsIconPng = path.join(appRoot, 'settings.png');
@@ -109,16 +112,23 @@ window.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('settings-btn-icon').src = settingsIconPng;
     document.getElementById('close-btn-icon').src = closeIconPng;
     searchIcon.src = cortanaIcon;
-    reminderIcon.src = idleGif;
+    reminderIcon.src = idleVideo;
 
     document.getElementById('close-btn').addEventListener('click', () => ipcRenderer.send('close-app'));
     searchBar.addEventListener('keydown', (event) => { if (event.key === 'Enter') onSearch(); });
     searchBar.addEventListener('focus', () => {
-        if (animationContainer.className === 'active') setStateIdle();
+        if (animationContainer.className === 'active') {
+            setStateIdle();
+        } else {
+            gifDisplay.src = listeningVideo;
+        }
         onSound.play();
         searchIcon.src = searchIconPng;
     });
     searchBar.addEventListener('blur', () => {
+        if (animationContainer.className === 'idle') {
+            gifDisplay.src = idleVideo;
+        }
         offSound.play();
         searchIcon.src = cortanaIcon;
     });
@@ -247,11 +257,21 @@ function displayAndSpeak(text, callback, options = {}, isError = false) {
         showWebLink();
     }
 
+    const onSpeechEndCallback = isError ? () => {
+        gifDisplay.src = errorVideo;
+        setTimeout(() => {
+            isBusy = false;
+            searchBar.disabled = false;
+            searchBar.placeholder = 'Type here to search';
+            gifDisplay.src = idleVideo;
+        }, 3800);
+    } : callback;
+
     if (isError) {
         errorSound.play();
-        errorSound.onended = () => speak(text, callback);
+        errorSound.onended = () => speak(text, onSpeechEndCallback);
     } else {
-        speak(text, callback);
+        speak(text, onSpeechEndCallback);
     }
 }
 
@@ -314,13 +334,13 @@ function onActionFinished() {
     }
 
     isBusy = false;
-    gifDisplay.src = speakingEndGif;
+    gifDisplay.src = speakingEndVideo;
     searchBar.disabled = false;
     searchBar.placeholder = 'Type here to search';
 
     finishSpeakingTimeout = setTimeout(() => {
         if (animationContainer.className === 'active') {
-            gifDisplay.src = idleGif;
+            gifDisplay.src = idleVideo;
         }
     }, 1000);
 }
@@ -348,7 +368,10 @@ function setStateIdle() {
     ipcRenderer.send('set-webview-visibility', false);
     webviewContainer.classList.remove('visible');
     animationContainer.className = 'idle';
-    gifDisplay.src = idleGif;
+    gifDisplay.src = idleVideo;
+    if(document.activeElement === searchBar) {
+        gifDisplay.src = listeningVideo;
+    }
     resultsDisplay.innerHTML = `<p class="fade-in-item">What's on your mind?</p>`;
     webLinkContainer.style.display = 'none';
     webLinkContainer.style.opacity = '0';
@@ -611,7 +634,7 @@ function onSaveReminder() {
 
         if (editingReminderId) {
             ipcRenderer.send('update-reminder', { id: editingReminderId, ...reminderPayload });
-            text = `OK. I've updated your reminder.`;
+            text = `OK. I've updated your.`;
         } else {
             ipcRenderer.send('set-reminder', reminderPayload);
             const friendlyTime = reminderDate.toLocaleString([], { weekday: 'long', hour: '2-digit', minute: '2-digit' });
@@ -622,7 +645,7 @@ function onSaveReminder() {
         reminderContainer.classList.remove('visible');
         animationContainer.style.display = 'block';
         setStateActive();
-        gifDisplay.src = speakingGif;
+        gifDisplay.src = speakingVideo;
 
         displayAndSpeak(text, onActionFinished, {}, false);
     } else {
@@ -759,7 +782,7 @@ function processQuery(query) {
     const isReminder = reminderWithTimeMatch || reminderWithoutTimeMatch || genericReminderMatch || simplestReminderMatch;
 
     if (showRemindersMatch) {
-        gifDisplay.src = speakingGif;
+        gifDisplay.src = speakingVideo;
         showReminders();
         return;
     }
@@ -801,7 +824,7 @@ function processQuery(query) {
 
     const isWebSearch = !calculatorMatch && !timeQueryMatch && !genericTimeMatch && !jokeMatch && !retiledMatch && !weatherMatch && !dateMatch && !versionMatch && !openAppMatch && !thanksMatch && !byeMatch && !helloMatch && !helpMatch && !marryMatch && !bodyMatch && !statusQueryMatch;
 
-    gifDisplay.src = speakingGif;
+    gifDisplay.src = speakingVideo;
 
     if (isWebSearch) {
         if (navigator.onLine) {
@@ -872,7 +895,7 @@ function onSearch() {
     searchBar.value = '';
     searchBar.placeholder = 'Thinking...';
     searchBar.disabled = true;
-    gifDisplay.src = thinkingGif;
+    gifDisplay.src = thinkingVideo;
 
     if (instantResponse) {
         processQuery(query);
