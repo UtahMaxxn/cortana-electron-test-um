@@ -10,7 +10,6 @@ app.setAppUserModelId(APP_ID);
 let mainWindow;
 const winWidth = 360;
 const winHeight = 640;
-let isWebViewVisible = false;
 let isSettingsVisible = false;
 let tray = null;
 let isClosing = false;
@@ -171,8 +170,7 @@ function createWindow() {
         show: false,
         webPreferences: {
             nodeIntegration: true,
-            contextIsolation: false,
-            webviewTag: true,
+            contextIsolation: false
         },
     };
 
@@ -221,7 +219,7 @@ function createWindow() {
     };
 
     const handleBlur = () => {
-        if (isWebViewVisible || isSettingsVisible || settings.isMovable) {
+        if (isSettingsVisible || settings.isMovable) {
             return;
         }
         if (!mainWindow || mainWindow.isDestroyed()) {
@@ -254,7 +252,6 @@ function createWindow() {
     ipcMain.on('close-app', closeApp);
     ipcMain.on('open-external-link', (event, url) => {
         shell.openExternal(url);
-        closeApp();
     });
 
     ipcMain.handle('get-settings', async () => {
@@ -384,10 +381,6 @@ function createWindow() {
 
     ipcMain.handle('get-app-version', () => {
         return app.getVersion();
-    });
-
-    ipcMain.on('set-webview-visibility', (event, visible) => {
-        isWebViewVisible = visible;
     });
 
     ipcMain.on('set-settings-visibility', (event, visible) => {

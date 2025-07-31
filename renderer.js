@@ -3,12 +3,10 @@ const path = require('path');
 
 let searchBar, searchIcon;
 let animationContainer, gifDisplay, resultsDisplay, contentWrapper;
-let webviewContainer, webviewFrame;
 let webLinkContainer, webLink, webIcon;
 let appContainer;
 let finishSpeakingTimeout = null;
 let editingReminderId = null;
-let currentWebviewUrl = '';
 
 let reminderContainer, reminderTextInput, reminderTimeInput, reminderSaveBtn, reminderCancelBtn, reminderIcon;
 
@@ -100,8 +98,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     gifDisplay = document.getElementById('gif-display');
     resultsDisplay = document.getElementById('results-display');
     contentWrapper = document.getElementById('content-wrapper');
-    webviewContainer = document.getElementById('webview-container');
-    webviewFrame = document.getElementById('webview-frame');
     webLinkContainer = document.getElementById('web-link-container');
     webLink = document.getElementById('web-link');
     webIcon = document.getElementById('web-icon');
@@ -165,13 +161,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         if (lastQuery) {
             const url = getSearchUrl(lastQuery);
             ipcRenderer.send('open-external-link', url);
-        }
-    });
-
-    webviewFrame.addEventListener('will-navigate', (e) => {
-        if (e.url !== currentWebviewUrl) {
-            e.preventDefault();
-            ipcRenderer.send('open-external-link', e.url);
+            ipcRenderer.send('close-app');
         }
     });
 
@@ -198,9 +188,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     addCustomResponseBtn.addEventListener('click', () => showCustomResponseForm());
     customResponseSaveBtn.addEventListener('click', onSaveCustomResponse);
     customResponseCancelBtn.addEventListener('click', hideCustomResponseForm);
-
-    const mobileUserAgent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Mobile/15E148 Safari/604.1';
-    webviewFrame.setAttribute('useragent', mobileUserAgent);
 
     ipcRenderer.on('go-idle-and-close', () => {
         if (!appContainer.classList.contains('visible')) return;
@@ -248,8 +235,6 @@ window.addEventListener('DOMContentLoaded', async () => {
 function showSettingsUI() {
     animationContainer.style.display = 'none';
     reminderContainer.classList.remove('visible');
-    webviewContainer.classList.remove('visible');
-    ipcRenderer.send('set-webview-visibility', false);
     ipcRenderer.send('set-settings-visibility', true);
 
     settingsContainer.classList.add('visible');
@@ -567,8 +552,6 @@ function setStateIdle() {
     isBusy = false;
 
     if (searchIcon) searchIcon.src = cortanaIcon;
-    ipcRenderer.send('set-webview-visibility', false);
-    webviewContainer.classList.remove('visible');
     animationContainer.className = 'idle';
     gifDisplay.src = idleVideo;
     if(document.activeElement === searchBar) {
@@ -598,21 +581,14 @@ function getSearchUrl(query) {
     }
 }
 
-function showWebView(url, showLink = true) {
-    ipcRenderer.send('set-webview-visibility', true);
-    currentWebviewUrl = url;
-    webviewFrame.src = url;
-    webviewContainer.classList.add('visible');
-    if (showLink) {
-        showWebLink();
-    }
-}
-
 function performWebSearch(query) {
-    const summaryText = `Here is what I found for "${query}".`;
-    displayAndSpeak(summaryText, onActionFinished, {}, false);
+    const summaryText = `Searching the web for "${query}"...`;
     const searchUrl = getSearchUrl(query);
-    showWebView(searchUrl, false);
+    
+    displayAndSpeak(summaryText, () => {
+        ipcRenderer.send('open-external-link', searchUrl);
+        ipcRenderer.send('close-app');
+    }, {}, false);
 }
 
 function showWebLink() {
@@ -673,8 +649,11 @@ async function getWeather(location) {
 
         lastQuery = `weather in ${location}`;
         responseText = `Here's the weather from MSN for ${locationNameForSpeech}.`;
-        displayAndSpeak(responseText, onActionFinished, {}, false);
-        showWebView(weatherUrl);
+
+        displayAndSpeak(responseText, () => {
+            ipcRenderer.send('open-external-link', weatherUrl);
+            ipcRenderer.send('close-app');
+        }, {}, false);
 
     } catch (error) {
         responseText = `Sorry, an unexpected error occurred while getting the weather.`;
