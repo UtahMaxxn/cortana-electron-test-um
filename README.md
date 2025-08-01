@@ -12,9 +12,9 @@ So, I decided to try and work on bringing Cortana back, the way I remember.
 ### Features
 
 *   **TTS Responses:** Utilizes the built-in system Text-to-Speech engine (like Windows Zira) to speak responses.
-*   **Bing Web Search:** Opens a mobile-formatted Bing search in an integrated webview for general queries. (Unfinished, buggy.)
+*   **Bing Web Search:** Opens a mobile-formatted Bing search in an integrated webview for general queries.
 *   **Built-in Skills:**
-    *   **Weather Forecast:** Ask "weather in [CITY OR ZIP CODE RIGHT HERE]" to get current conditions. (Unfinished, buggy.)
+    *   **Weather Forecast:** Ask "weather in [CITY OR ZIP CODE RIGHT HERE]" to get current conditions.
     *   **Calculator:** Type any simple math equation to get a quick answer. (An example would be: 8*8)
     *   **Time Lookup:** Ask for the time locally ("what time is it?") or in any major city ("time in Tokyo").
     *   **Jokes:** Because every assistant needs some jokes. C'mon. (Local-only set of jokes that'll be expanded on over time.)
