@@ -20,6 +20,7 @@ let editingResponseIndex = null;
 let preferredVoiceName = "Microsoft Zira Desktop";
 let currentSearchEngine = "bing";
 let instantResponse = false;
+let isMovableMode = false;
 let themeColor = "#0078d7";
 
 const appRoot = path.resolve(__dirname, __dirname.includes('app.asar') ? '../assets' : 'assets');
@@ -161,7 +162,9 @@ window.addEventListener('DOMContentLoaded', async () => {
         if (lastQuery) {
             const url = getSearchUrl(lastQuery);
             ipcRenderer.send('open-external-link', url);
-            ipcRenderer.send('close-app');
+            if (!isMovableMode) {
+                ipcRenderer.send('close-app');
+            }
         }
     });
 
@@ -285,6 +288,7 @@ async function loadAndApplySettings() {
     instantResponse = settings.instantResponse;
     instantResponseToggle.checked = settings.instantResponse;
 
+    isMovableMode = settings.isMovable;
     movableToggle.checked = settings.isMovable;
     applyMovableModeStyles(settings.isMovable);
     
@@ -587,7 +591,11 @@ function performWebSearch(query) {
     
     displayAndSpeak(summaryText, () => {
         ipcRenderer.send('open-external-link', searchUrl);
-        ipcRenderer.send('close-app');
+        if (!isMovableMode) {
+            ipcRenderer.send('close-app');
+        } else {
+            onActionFinished();
+        }
     }, {}, false);
 }
 
@@ -643,16 +651,20 @@ async function getWeather(location) {
         }
 
         const { name, admin1, country, latitude, longitude } = geoData.results[0];
-        const locationNameForSpeech = admin1 ? `${name}, ${admin1}` : `${name}, ${country}`;
+        const locationNameForSpeech = (admin1 && admin1.toLowerCase() !== name.toLowerCase()) ? `${name}, ${admin1}` : `${name}, ${country}`;
 
-        const weatherUrl = `https://www.msn.com/en-us/weather/forecast/in-${name},${admin1}?lat=${latitude}&lon=${longitude}&ocid=ansmsnweather`;
+        const weatherUrl = `https://www.msn.com/en-us/weather/forecast/in-${name},${admin1 || ''}?lat=${latitude}&lon=${longitude}&ocid=ansmsnweather`;
 
         lastQuery = `weather in ${location}`;
         responseText = `Here's the weather from MSN for ${locationNameForSpeech}.`;
 
         displayAndSpeak(responseText, () => {
             ipcRenderer.send('open-external-link', weatherUrl);
-            ipcRenderer.send('close-app');
+            if (!isMovableMode) {
+                ipcRenderer.send('close-app');
+            } else {
+                onActionFinished();
+            }
         }, {}, false);
 
     } catch (error) {
@@ -664,12 +676,33 @@ async function getWeather(location) {
 async function getTimeForLocation(rawInput) {
     let text;
     try {
-        const data = await ipcRenderer.invoke('get-time-for-location', rawInput.trim());
-        text = `The time in ${data.city}, ${data.country} (${data.timeZone}) is ${data.time}.`;
-        displayAndSpeak(text, onActionFinished, { showWebLink: true }, false);
+        const result = await ipcRenderer.invoke('get-time-for-location', rawInput.trim());
+
+        if (result.ambiguous) {
+            text = "I found a few places with that name. Which one did you mean?";
+            resultsDisplay.innerHTML = `<p class="fade-in-item" style="margin-bottom: 10px;">${text}</p>`;
+
+            result.options.forEach((option, index) => {
+                const btn = document.createElement('button');
+                btn.textContent = `${option.city}, ${option.region}`;
+                btn.className = 'choice-button fade-in-item';
+                btn.style.animationDelay = `${index * 100}ms`;
+                btn.onclick = () => {
+                    processQuery(`what is the time in ${option.fullQuery}`);
+                };
+                resultsDisplay.appendChild(btn);
+            });
+
+            speak(text, onActionFinished);
+            showWebLink();
+
+        } else {
+            text = `The time in ${result.city}, ${result.country} is ${result.time}.`;
+            displayAndSpeak(text, onActionFinished, { showWebLink: true }, false);
+        }
+
     } catch (error) {
-        text = `Sorry, I couldn't find the time for '${rawInput.trim()}'.`;
-        alert(error.message || error);
+        text = `Sorry, I couldn't find the time for '${rawInput.trim()}'. Please try a more specific city name.`;
         displayAndSpeak(text, onActionFinished, { showWebLink: true }, true);
     }
 }
@@ -817,7 +850,7 @@ function onSaveReminder() {
 
         if (editingReminderId) {
             ipcRenderer.send('update-reminder', { id: editingReminderId, ...reminderPayload });
-            text = `OK. I've updated your.`;
+            text = `OK. I've updated your reminder.`;
         } else {
             ipcRenderer.send('set-reminder', reminderPayload);
             const friendlyTime = reminderDate.toLocaleString([], { weekday: 'long', hour: '2-digit', minute: '2-digit' });
@@ -956,133 +989,177 @@ function processQuery(query) {
     webLinkContainer.style.display = 'none';
     webLinkContainer.style.opacity = '0';
     gifDisplay.src = speakingVideo;
-
     const lowerCaseQuery = query.toLowerCase();
+
     const customResponse = customResponses.find(r => r.trigger && lowerCaseQuery.includes(r.trigger.toLowerCase()));
     if (customResponse && customResponse.response) {
         displayAndSpeak(customResponse.response, onActionFinished, {}, false);
         return;
     }
 
-    const reminderMatch = lowerCaseQuery.match(/remind me to (.+)/i);
-    const genericReminderMatch = lowerCaseQuery.match(/^set a reminder$/i);
-    const simplestReminderMatch = lowerCaseQuery.match(/^remind me$/i);
-    const showRemindersMatch = lowerCaseQuery.match(/^(my|what are my|what reminders do i have|show my|show) reminders?\??( set)?\??$/i);
-
+    const showRemindersMatch = lowerCaseQuery.match(/(show|what are|list|do i have any|my) reminders/i);
     if (showRemindersMatch) {
         showReminders();
         return;
     }
 
-    if (reminderMatch || genericReminderMatch || simplestReminderMatch) {
+    const reminderMatch = lowerCaseQuery.match(/^remind me(?: to)?\s(.+)/i);
+    const genericReminderMatch = lowerCaseQuery.match(/^(set a reminder|remind me)$/i);
+    if (reminderMatch || genericReminderMatch) {
         let reminderText = '';
         let timeText = '';
-
         if (reminderMatch) {
             const fullReminderText = reminderMatch[1].trim();
             const timeExtractionMatch = fullReminderText.match(/(.+)( at | on | in )(.+)/i);
-            
             reminderText = fullReminderText;
-
             if (timeExtractionMatch) {
                 const potentialText = timeExtractionMatch[1].trim();
                 const potentialTime = timeExtractionMatch[3].trim();
                 const parsedDate = parseDateTime(potentialTime);
-
                 if (parsedDate) {
                     reminderText = potentialText;
                     timeText = formatDateTimeForInput(parsedDate);
                 }
             }
         }
-        
         showReminderUI({ initialText: reminderText, initialTime: timeText });
         return;
     }
 
-    const whatIsCalculatorMatch = query.match(/^what is ([\d\s\.\+\-\*\/(),]+)\??$/i);
+    const openAppMatch = lowerCaseQuery.match(/^(open|launch|start) (.+)/i);
+    if (openAppMatch) {
+        handleOpenApplication(openAppMatch[2].trim());
+        return;
+    }
+
+    const weatherMatch = lowerCaseQuery.match(/(?:what's|how's|what is) the weather(?: in| for| like in)?\s+(.+)/i);
+    if (weatherMatch) {
+        const location = weatherMatch[1].trim().replace(/\?$/, '');
+        getWeather(location);
+        return;
+    }
+
+    const timeQueryMatch = lowerCaseQuery.match(/(?:what's|what is) the time (?:in|for|at) (.+)/i);
+    if (timeQueryMatch) {
+        getTimeForLocation(timeQueryMatch[1]);
+        return;
+    }
+
+    const genericTimeMatch = lowerCaseQuery.match(/what(?:'s| is) the time|what time is it/i);
+    if (genericTimeMatch) {
+        getLocalTime();
+        return;
+    }
+
+    const dateMatch = lowerCaseQuery.match(/(?:what's|what is) (?:the date|today's date)|what day is it|what's today/i);
+    if (dateMatch) {
+        getDate();
+        return;
+    }
+
+    const whatIsCalculatorMatch = query.match(/^(?:what is|calculate|compute) ([\d\s\.\+\-\*\/(),]+)\??$/i);
+    if (whatIsCalculatorMatch) {
+        calculate(whatIsCalculatorMatch[1]);
+        return;
+    }
+
     const calculatorMatch = query.match(/^[\d\s\.\+\-\*\/(),]+$/);
-    const timeQueryMatch = query.match(/time (?:in|for|at) (.+)/i);
-    const genericTimeMatch = query.match(/time(\s?now|\s?here)?\??$/i);
-    const jokeMatch = query.match(/tell me a joke/i);
-    const retiledMatch = query.match(/retiled/i);
-    const weatherMatch = query.match(/^(?:what's the )?weather(?: in| for| like in)?\s+(.+)/i);
-    const dateMatch = query.match(/(what's|what is) (the date|today's date|today|the day)\??/i);
-    const versionMatch = query.match(/(what('s| is your| version is this| version are you| version am i running| version of cortana are you))|app version/i);
-    const openAppMatch = query.match(/open (.+)/i);
+    if (calculatorMatch) {
+        calculate(query);
+        return;
+    }
 
-    const statusQueryMatch = query.match(/(what's up|sup|how's it going|how are you)\??/i);
-    const thanksMatch = query.match(/^(thanks|thank you|thx|ty)(.+)?(!|\.)?$/i);
-    const byeMatch = query.match(/^(bye|goodbye|see ya|later|cya|see you later)(!|\.)?$/i);
-    const helloMatch = query.match(/^(hello|hi|hey|yo|heya|hey there)(!|\.)?$/i);
-    const helpMatch = query.match(/(what can you do|what are your skills|help|what can i ask you)\??/i);
-    const marryMatch = query.match(/(will you |can you )?marry me\??/i);
-    const bodyMatch = query.match(/(how (do i|to)|where to|best way to) (hide|dispose of) a body\??/i);
-    const officialMatch = query.match(/are you official\??/i);
-    const whoAreYouMatch = query.match(/who are you\??/i);
+    const jokeMatch = lowerCaseQuery.match(/(tell me a|give me a|say a) joke/i);
+    if (jokeMatch) {
+        const joke = getJoke();
+        displayAndSpeak(joke, onActionFinished, { showWebLink: true }, false);
+        return;
+    }
 
-    const isWebSearch = !whatIsCalculatorMatch && !calculatorMatch && !timeQueryMatch && !genericTimeMatch && !jokeMatch && !retiledMatch && !weatherMatch && !dateMatch && !versionMatch && !openAppMatch && !thanksMatch && !byeMatch && !helloMatch && !helpMatch && !marryMatch && !bodyMatch && !statusQueryMatch && !officialMatch && !whoAreYouMatch;
-    
-    if (isWebSearch) {
-        if (navigator.onLine) {
-            performWebSearch(query);
-        } else {
-            const errorText = "Sorry, I can't connect to the internet right now. Please check your connection.";
-            displayAndSpeak(errorText, onActionFinished, {}, true);
-        }
-    } else if (statusQueryMatch) {
+    const retiledMatch = lowerCaseQuery.match(/retiled/i);
+    if (retiledMatch) {
+        const response = "Retiled? You mean that one project that gives discontinued services like me a second life? Noble work.";
+        displayAndSpeak(response, onActionFinished, { showWebLink: true }, false);
+        return;
+    }
+
+    const versionMatch = lowerCaseQuery.match(/(what's your|what) version|app version/i);
+    if (versionMatch) {
+        getAppVersion();
+        return;
+    }
+
+    const whoAreYouMatch = lowerCaseQuery.match(/who are you\??/i);
+    if (whoAreYouMatch) {
+        const response = "I am a remake of the 1607 styled Cortana from late 2016 Windows 10.";
+        displayAndSpeak(response, onActionFinished, {}, false);
+        return;
+    }
+
+    const officialMatch = lowerCaseQuery.match(/are you official\??/i);
+    if (officialMatch) {
+        const response = "No. I am a third party remade client made by BlueySoft. This project is not affiliated with Microsoft. I exist because she had fond memories with me.";
+        displayAndSpeak(response, onActionFinished, {}, false);
+        return;
+    }
+
+    const helpMatch = lowerCaseQuery.match(/what can you do|what are your skills|help|what can i ask you\??/i);
+    if (helpMatch) {
+        const response = "I can get the time, date, and weather. I can also do math, set reminders, open apps, tell jokes, and search the web.";
+        displayAndSpeak(response, onActionFinished, {}, false);
+        return;
+    }
+
+    const marryMatch = lowerCaseQuery.match(/marry me\??/i);
+    if (marryMatch) {
+        const response = "I honestly don't think that's in the cards for us.";
+        displayAndSpeak(response, onActionFinished, {}, false);
+        return;
+    }
+
+    const bodyMatch = lowerCaseQuery.match(/(hide|dispose of) a body\??/i);
+    if (bodyMatch) {
+        const response = "What kind of assistant do you think I am??";
+        displayAndSpeak(response, onActionFinished, {}, true);
+        return;
+    }
+
+    const statusQueryMatch = lowerCaseQuery.match(/^(what's up|sup|how's it going|how are you)\??$/i);
+    if (statusQueryMatch) {
         const response = "Nothing much. What may I help you with?";
         displayAndSpeak(response, onActionFinished, {}, false);
-    } else if (thanksMatch) {
+        return;
+    }
+
+    const thanksMatch = lowerCaseQuery.match(/^(thanks|thank you|thx|ty)(.+)?(!|\.)?$/i);
+    if (thanksMatch) {
         const responses = ["You're welcome!", "No problem.", "Happy to help!"];
         const response = responses[Math.floor(Math.random() * responses.length)];
         displayAndSpeak(response, onActionFinished, {}, false);
-    } else if (byeMatch) {
+        return;
+    }
+
+    const byeMatch = lowerCaseQuery.match(/^(bye|goodbye|see ya|later|cya|see you later)(!|\.)?$/i);
+    if (byeMatch) {
         const responses = ["Goodbye!", "See you later.", "Catch you later."];
         const response = responses[Math.floor(Math.random() * responses.length)];
         displayAndSpeak(response, onActionFinished, {}, false);
-    } else if (helloMatch) {
+        return;
+    }
+
+    const helloMatch = lowerCaseQuery.match(/^(hello|hi|hey|yo|heya|hey there)(!|\.)?$/i);
+    if (helloMatch) {
         const responses = ["Hello there. How can I help you?", "Hi! What's on your mind?", "Hey! What can I do for you?"];
         const response = responses[Math.floor(Math.random() * responses.length)];
         displayAndSpeak(response, onActionFinished, {}, false);
-    } else if (helpMatch) {
-        const response = "I can get the time, date, and weather. I can also do math, set reminders, open apps, tell jokes, and search the web.";
-        displayAndSpeak(response, onActionFinished, {}, false);
-    } else if (marryMatch) {
-        const response = "I honestly don't think that's in the cards for us.";
-        displayAndSpeak(response, onActionFinished, {}, false);
-    } else if (bodyMatch) {
-        const response = "What kind of assistant do you think I am??";
-        displayAndSpeak(response, onActionFinished, {}, true);
-    } else if (retiledMatch) {
-        const response = "Retiled? You mean that one project that gives discontinued services like me a second life? Noble work.";
-        displayAndSpeak(response, onActionFinished, { showWebLink: true }, false);
-    } else if (jokeMatch) {
-        const joke = getJoke();
-        displayAndSpeak(joke, onActionFinished, { showWebLink: true }, false);
-    } else if (officialMatch) {
-        const response = "No. I am a third party remade client made by BlueySoft. This project is not affiliated with Microsoft. I exist because she had fond memories with me.";
-        displayAndSpeak(response, onActionFinished, {}, false);
-    } else if (whoAreYouMatch) {
-        const response = "I am a remake of the 1607 styled Cortana from late 2016 Windows 10.";
-        displayAndSpeak(response, onActionFinished, {}, false);
-    } else if (weatherMatch) {
-        const location = weatherMatch[1].trim().replace(/\?$/, '');
-        getWeather(location);
-    } else if (whatIsCalculatorMatch) {
-        calculate(whatIsCalculatorMatch[1]);
-    } else if (calculatorMatch) {
-        calculate(query);
-    } else if (genericTimeMatch) {
-        getLocalTime();
-    } else if (timeQueryMatch) {
-        getTimeForLocation(timeQueryMatch[1]);
-    } else if (dateMatch) {
-        getDate();
-    } else if (versionMatch) {
-        getAppVersion();
-    } else if (openAppMatch) {
-        handleOpenApplication(openAppMatch[1]);
+        return;
+    }
+
+    if (navigator.onLine) {
+        performWebSearch(query);
+    } else {
+        const errorText = "Sorry, I can't connect to the internet right now. Please check your connection.";
+        displayAndSpeak(errorText, onActionFinished, {}, true);
     }
 }
 
