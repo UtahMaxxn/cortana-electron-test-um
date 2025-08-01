@@ -16,7 +16,7 @@ So, I decided to try and work on bringing Cortana back, the way I remember.
 *   **Built-in Skills:**
     *   **Weather Forecast:** Ask "weather in [CITY OR ZIP CODE RIGHT HERE]" to get current conditions. (Unfinished, buggy.)
     *   **Calculator:** Type any simple math equation to get a quick answer. (An example would be: 8*8)
-    *   **Time Lookup:** Ask for the time locally ("what time is it?") or in any major city ("time in Tokyo"). (Unfinished, buggy.)
+    *   **Time Lookup:** Ask for the time locally ("what time is it?") or in any major city ("time in Tokyo").
     *   **Jokes:** Because every assistant needs some jokes. C'mon. (Local-only set of jokes that'll be expanded on over time.)
     *   **Reminders:** Cortana can remind you to do things.
     *   **More:** Cortana can launch applications for you. Cortana can tell you the day.
