@@ -154,6 +154,7 @@ async function findApplicationsIn(folder) {
       }
     }
   } catch (err) {
+    console.error(`Failed to read application folder: ${folder}`, err);
   }
   return results;
 }
@@ -417,7 +418,8 @@ function createWindow() {
             };
 
         } catch (error) {
-            throw error;
+            console.error(`Time lookup failed for "${cityInput}":`, error);
+            throw new Error(`Failed to get time for ${cityInput}`);
         }
     });
   

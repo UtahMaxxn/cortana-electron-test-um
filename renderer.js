@@ -250,28 +250,37 @@ function showSettingsUI() {
 }
 
 function hexToHsl(H) {
-    let r = 0, g = 0, b = 0;
-    if (H.length == 4) {
-        r = "0x" + H[1] + H[1];
-        g = "0x" + H[2] + H[2];
-        b = "0x" + H[3] + H[3];
-    } else if (H.length == 7) {
-        r = "0x" + H[1] + H[2];
-        g = "0x" + H[3] + H[4];
-        b = "0x" + H[5] + H[6];
-    }
+    const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+    H = H.replace(shorthandRegex, (m, r, g, b) => r + r + g + g + b + b);
+
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(H);
+    if (!result) return { h: 207, s: 82, l: 42 };
+
+    let r = parseInt(result[1], 16);
+    let g = parseInt(result[2], 16);
+    let b = parseInt(result[3], 16);
+
     r /= 255; g /= 255; b /= 255;
-    let cmin = Math.min(r,g,b), cmax = Math.max(r,g,b), delta = cmax - cmin, h = 0, s = 0, l = 0;
-    if (delta == 0) h = 0;
-    else if (cmax == r) h = ((g - b) / delta) % 6;
-    else if (cmax == g) h = (b - r) / delta + 2;
-    else h = (r - g) / delta + 4;
-    h = Math.round(h * 60);
-    if (h < 0) h += 360;
-    l = (cmax + cmin) / 2;
-    s = delta == 0 ? 0 : delta / (1 - Math.abs(2 * l - 1));
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h, s, l = (max + min) / 2;
+
+    if (max === min) {
+        h = s = 0; // achromatic
+    } else {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch (max) {
+            case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+            case g: h = (b - r) / d + 2; break;
+            case b: h = (r - g) / d + 4; break;
+        }
+        h /= 6;
+    }
+
+    h = Math.round(h * 360);
     s = +(s * 100).toFixed(1);
     l = +(l * 100).toFixed(1);
+
     return { h, s, l };
 }
 
@@ -577,8 +586,14 @@ function setStateActive() {
 function getSearchUrl(query) {
     const encodedQuery = encodeURIComponent(query);
     switch (currentSearchEngine) {
+        case 'google':
+            return `https://www.google.com/search?q=${encodedQuery}`;
         case 'duckduckgo':
             return `https://duckduckgo.com/?q=${encodedQuery}`;
+        case 'brave':
+            return `https://search.brave.com/search?q=${encodedQuery}`;
+        case 'ecosia':
+            return `https://www.ecosia.org/search?q=${encodedQuery}`;
         case 'bing':
         default:
             return `https://www.bing.com/search?q=${encodedQuery}`;
@@ -608,7 +623,17 @@ function showWebLink() {
     } else if (currentSearchEngine === 'duckduckgo') {
         webIcon.src = searchIconPng;
         webLinkSpan.textContent = 'See more results on DuckDuckGo';
+    } else if (currentSearchEngine === 'google') {
+        webIcon.src = searchIconPng;
+        webLinkSpan.textContent = 'See more results on Google';
+    } else if (currentSearchEngine === 'brave') {
+        webIcon.src = searchIconPng;
+        webLinkSpan.textContent = 'See more results on Brave';
+    } else if (currentSearchEngine === 'ecosia') {
+        webIcon.src = searchIconPng;
+        webLinkSpan.textContent = 'See more results on Ecosia';
     }
+
 
     webLinkContainer.style.display = 'block';
     setTimeout(() => {
@@ -652,8 +677,8 @@ async function getWeather(location) {
 
         const { name, admin1, country, latitude, longitude } = geoData.results[0];
         const locationNameForSpeech = (admin1 && admin1.toLowerCase() !== name.toLowerCase()) ? `${name}, ${admin1}` : `${name}, ${country}`;
-
-        const weatherUrl = `https://www.msn.com/en-us/weather/forecast/in-${name},${admin1 || ''}?lat=${latitude}&lon=${longitude}&ocid=ansmsnweather`;
+        const locationForUrl = admin1 ? `${name},${admin1}` : name;
+        const weatherUrl = `https://www.msn.com/en-us/weather/forecast/in-${locationForUrl}?lat=${latitude}&lon=${longitude}&ocid=ansmsnweather`;
 
         lastQuery = `weather in ${location}`;
         responseText = `Here's the weather from MSN for ${locationNameForSpeech}.`;
