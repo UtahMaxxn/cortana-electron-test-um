@@ -48,6 +48,7 @@ const requestSound = new Audio(path.join(appRoot, 'request.wav'));
 const onSound = new Audio(path.join(appRoot, 'on.wav'));
 const offSound = new Audio(path.join(appRoot, 'off.wav'));
 const errorSound = new Audio(path.join(appRoot, 'error.wav'));
+const drumrollSound = new Audio(path.join(appRoot, 'drumroll.mp3'));
 
 let isBusy = false;
 let lastQuery = '';
@@ -172,8 +173,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     searchIcon.src = cortanaIcon;
     reminderIcon.src = idleVideo;
 
-    const imagesToPreload = [idleVideo, speakingVideo, speakingEndVideo, thinkingVideo, listeningVideo, errorVideo];
-    imagesToPreload.forEach(src => { new Image().src = src; });
+    const assetsToPreload = [idleVideo, speakingVideo, speakingEndVideo, thinkingVideo, listeningVideo, errorVideo, drumrollSound.src];
+    assetsToPreload.forEach(src => { new Image().src = src; });
 
     document.getElementById('close-btn').addEventListener('click', () => ipcRenderer.send('close-app'));
     searchBar.addEventListener('keydown', (event) => { if (event.key === 'Enter') onSearch(); });
@@ -697,6 +698,8 @@ function setStateIdle() {
     window.speechSynthesis.cancel();
     requestSound.pause();
     requestSound.currentTime = 0;
+    drumrollSound.pause();
+    drumrollSound.currentTime = 0;
 
     isBusy = false;
 
@@ -1155,6 +1158,16 @@ function processQuery(query) {
     const customResponse = customResponses.find(r => r.trigger && lowerCaseQuery.includes(r.trigger.toLowerCase()));
     if (customResponse && customResponse.response) {
         displayAndSpeak(customResponse.response, onActionFinished, {}, false);
+        return;
+    }
+
+    const drumrollMatch = lowerCaseQuery.match(/^(drum ?roll)(,)?( please)?(!|\.|\?)?$/i);
+    if (drumrollMatch) {
+        const playDrumroll = () => {
+            drumrollSound.play();
+            drumrollSound.onended = onActionFinished;
+        };
+        displayAndSpeak("Here goes nothing!", playDrumroll, {}, false);
         return;
     }
 
