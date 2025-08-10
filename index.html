@@ -57,8 +57,36 @@
                                     <select id="voice-select"></select>
                                 </div>
                                 <div class="setting-item">
+                                    <label for="pitch-slider">Speech Pitch</label>
+                                    <input type="range" id="pitch-slider" min="0.1" max="2" step="0.1" class="speech-slider">
+                                </div>
+                                <div class="setting-item">
+                                    <label for="rate-slider">Speech Speed</label>
+                                    <input type="range" id="rate-slider" min="0.5" max="2" step="0.1" class="speech-slider">
+                                </div>
+                                <div class="setting-item">
                                     <label for="theme-color-picker">Theme Colour</label>
                                     <input type="color" id="theme-color-picker" value="#0078d7">
+                                </div>
+                                <div class="setting-item">
+                                    <label for="idle-greeting-mode-select">Idle Greeting</label>
+                                    <select id="idle-greeting-mode-select">
+                                        <option value="random">Random</option>
+                                        <option value="specific">Specific</option>
+                                        <option value="custom">Custom</option>
+                                    </select>
+                                </div>
+                                <div id="specific-greeting-container" class="setting-sub-item">
+                                    <div class="setting-item">
+                                        <label for="specific-greeting-select">Greeting</label>
+                                        <select id="specific-greeting-select"></select>
+                                    </div>
+                                </div>
+                                <div id="custom-greeting-container" class="setting-sub-item">
+                                     <div class="setting-item">
+                                        <label for="custom-greeting-input">Custom Text</label>
+                                        <input type="text" id="custom-greeting-input" class="settings-text-input" placeholder="Hello!">
+                                    </div>
                                 </div>
                                 <p id="voice-warning" class="setting-warning">Cortana's default voice (Microsoft Zira Desktop) is not available.</p>
                             </div>
@@ -104,6 +132,11 @@
                                         <span class="slider"></span>
                                     </label>
                                 </div>
+                            </div>
+                            <div class="settings-section">
+                                <h2>Advanced</h2>
+                                <button id="reset-voice-btn" class="settings-button">Reset Voice Settings</button>
+                                <button id="reset-all-btn" class="settings-button danger">Reset All Settings & Reminders</button>
                             </div>
                         </div>
                         <div id="custom-response-form-container">

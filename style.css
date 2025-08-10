@@ -151,6 +151,7 @@ body.movable-mode #app-container {
     transform: translateX(-50%);
     transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     filter: hue-rotate(var(--hue-rotate-deg));
+    cursor: pointer;
 }
 
 #content-wrapper {
@@ -423,6 +424,7 @@ body.movable-mode #app-container {
     outline: none;
     margin-bottom: 15px;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    border-radius: 0;
 }
 
 #reminder-text-input::placeholder,
@@ -451,6 +453,7 @@ body.movable-mode #app-container {
     padding: 12px 0;
     cursor: pointer;
     font-size: 15px;
+    border-radius: 0;
 }
 
 .reminder-actions button:hover {
@@ -508,6 +511,7 @@ body.movable-mode #app-container {
     align-items: center;
     color: white;
     text-align: left;
+    border-radius: 0;
 }
 
 .reminder-text-container,
@@ -552,6 +556,7 @@ body.movable-mode #app-container {
     padding: 6px 10px;
     cursor: pointer;
     transition: background-color 0.2s ease;
+    border-radius: 0;
 }
 
 .reminder-action-btn:hover {
@@ -591,7 +596,6 @@ body.movable-mode #app-container {
 }
 
 #settings-back-btn {
-    /* The character used here is from the Segoe MDL2 Assets font, standard on Windows */
     font-family: 'Segoe MDL2 Assets', 'Segoe UI Symbol';
     font-size: 16px;
     background: transparent;
@@ -668,8 +672,21 @@ body.movable-mode #app-container {
     font-size: 15px;
 }
 
+.setting-sub-item {
+    display: none;
+    padding-left: 15px;
+}
+
+.setting-sub-item .setting-item {
+    border-top: 1px solid #333;
+    margin-left: -15px;
+    padding-left: 15px;
+}
+
 #voice-select,
-#search-engine-select {
+#search-engine-select,
+#idle-greeting-mode-select,
+#specific-greeting-select {
     background-color: transparent;
     color: white;
     border: 1px solid #888;
@@ -685,8 +702,59 @@ body.movable-mode #app-container {
     background-size: .65em auto;
 }
 
-#voice-select:hover, #search-engine-select:hover {
+.settings-text-input {
+    background-color: transparent;
+    color: white;
+    border: 1px solid #888;
+    padding: 8px 12px;
+    min-width: 150px;
+    max-width: 180px;
+    text-align: right;
+    font-size: 15px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    outline: none;
+    border-radius: 0;
+}
+
+#voice-select:hover, #search-engine-select:hover,
+#idle-greeting-mode-select:hover, #specific-greeting-select:hover,
+.settings-text-input:hover {
     background-color: #333;
+}
+.settings-text-input:focus {
+    border-color: var(--primary-color);
+}
+
+
+.speech-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 120px;
+    height: 3px;
+    background: #555;
+    outline: none;
+    transition: opacity .2s;
+    vertical-align: middle;
+}
+
+.speech-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background: var(--primary-color);
+    cursor: pointer;
+    border-radius: 0;
+    border: 2px solid #171717;
+}
+
+.speech-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: var(--primary-color);
+    cursor: pointer;
+    border-radius: 0;
+    border: 2px solid #171717;
 }
 
 #theme-color-picker {
@@ -700,11 +768,11 @@ body.movable-mode #app-container {
     cursor: pointer;
 }
 #theme-color-picker::-webkit-color-swatch {
-    border-radius: 4px;
+    border-radius: 0;
     border: 1px solid #888;
 }
 #theme-color-picker::-moz-color-swatch {
-    border-radius: 4px;
+    border-radius: 0;
     border: 1px solid #888;
 }
 
@@ -740,7 +808,7 @@ body.movable-mode #app-container {
     background-color: transparent;
     border: 1px solid #888;
     transition: .2s;
-    border-radius: 10px;
+    border-radius: 0;
 }
 
 .slider:before {
@@ -752,7 +820,7 @@ body.movable-mode #app-container {
     bottom: 3px;
     background-color: white;
     transition: .2s;
-    border-radius: 50%;
+    border-radius: 0;
 }
 
 input:checked + .slider {
@@ -773,11 +841,24 @@ input:checked + .slider:before {
     cursor: pointer;
     font-size: 14px;
     margin-top: 15px;
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    border-radius: 0;
 }
 
 .settings-button:hover {
     background-color: #444;
 }
+
+.settings-button.danger {
+    color: #e74c3c;
+    border-color: #e74c3c;
+}
+
+.settings-button.danger:hover {
+    background-color: #e74c3c;
+    color: white;
+}
+
 
 body.movable-mode #close-btn,
 body.movable-mode #drag-bar {

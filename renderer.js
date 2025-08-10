@@ -10,7 +10,8 @@ let editingReminderId = null;
 
 let reminderContainer, reminderTextInput, reminderTimeInput, reminderSaveBtn, reminderCancelBtn, reminderIcon;
 
-let settingsContainer, settingsBtn, settingsBackBtn, voiceSelect, startupToggle, startupWarning, voiceWarning, searchEngineSelect, instantResponseToggle, themeColorPicker, movableToggle;
+let settingsContainer, settingsBtn, settingsBackBtn, voiceSelect, startupToggle, startupWarning, voiceWarning, searchEngineSelect, instantResponseToggle, themeColorPicker, movableToggle, pitchSlider, rateSlider, resetVoiceBtn, resetAllBtn;
+let idleGreetingModeSelect, specificGreetingContainer, specificGreetingSelect, customGreetingContainer, customGreetingInput;
 let customResponseFormContainer, customResponseTriggerInput, customResponseResponseInput, customResponseSaveBtn, customResponseCancelBtn, customResponsesList, addCustomResponseBtn;
 
 let availableVoices = [];
@@ -22,6 +23,12 @@ let currentSearchEngine = "bing";
 let instantResponse = false;
 let isMovableMode = false;
 let themeColor = "#0078d7";
+let pitch = 1;
+let rate = 1;
+let idleGreetingMode = 'random';
+let specificIdleGreeting = "What's on your mind?";
+let customIdleGreeting = '';
+
 
 const appRoot = path.resolve(__dirname, __dirname.includes('app.asar') ? '../assets' : 'assets');
 
@@ -44,6 +51,26 @@ const errorSound = new Audio(path.join(appRoot, 'error.wav'));
 
 let isBusy = false;
 let lastQuery = '';
+
+const idleMessages = [
+    "What's on your mind?",
+    "Hello!",
+    "How can I help?",
+    "Hi!",
+    "Ask me anything."
+];
+
+function getIdleMessage() {
+    switch (idleGreetingMode) {
+        case 'specific':
+            return specificIdleGreeting;
+        case 'custom':
+            return customIdleGreeting.trim() || "Hello!";
+        case 'random':
+        default:
+            return idleMessages[Math.floor(Math.random() * idleMessages.length)];
+    }
+}
 
 const jokes = [
     "Why don't scientists trust atoms? Because they make up everything!",
@@ -121,6 +148,16 @@ window.addEventListener('DOMContentLoaded', async () => {
     instantResponseToggle = document.getElementById('instant-response-toggle');
     themeColorPicker = document.getElementById('theme-color-picker');
     movableToggle = document.getElementById('movable-toggle');
+    pitchSlider = document.getElementById('pitch-slider');
+    rateSlider = document.getElementById('rate-slider');
+    resetVoiceBtn = document.getElementById('reset-voice-btn');
+    resetAllBtn = document.getElementById('reset-all-btn');
+
+    idleGreetingModeSelect = document.getElementById('idle-greeting-mode-select');
+    specificGreetingContainer = document.getElementById('specific-greeting-container');
+    specificGreetingSelect = document.getElementById('specific-greeting-select');
+    customGreetingContainer = document.getElementById('custom-greeting-container');
+    customGreetingInput = document.getElementById('custom-greeting-input');
 
     customResponseFormContainer = document.getElementById('custom-response-form-container');
     customResponseTriggerInput = document.getElementById('custom-response-trigger-input');
@@ -157,6 +194,12 @@ window.addEventListener('DOMContentLoaded', async () => {
         searchIcon.src = cortanaIcon;
     });
 
+    gifDisplay.addEventListener('click', () => {
+        if (isBusy) {
+            setStateIdle();
+        }
+    });
+
     webLink.addEventListener('click', (e) => {
         e.preventDefault();
         if (lastQuery) {
@@ -187,10 +230,25 @@ window.addEventListener('DOMContentLoaded', async () => {
     instantResponseToggle.addEventListener('change', onInstantResponseToggleChanged);
     themeColorPicker.addEventListener('input', onThemeColorChanged, false);
     movableToggle.addEventListener('change', onMovableToggleChanged);
+    pitchSlider.addEventListener('input', onPitchChanged);
+    rateSlider.addEventListener('input', onRateChanged);
+    resetVoiceBtn.addEventListener('click', onResetVoiceSettings);
+    resetAllBtn.addEventListener('click', onResetAllSettings);
     
+    idleGreetingModeSelect.addEventListener('change', onIdleGreetingModeChanged);
+    specificGreetingSelect.addEventListener('change', onSpecificIdleGreetingChanged);
+    customGreetingInput.addEventListener('input', onCustomIdleGreetingChanged);
+
     addCustomResponseBtn.addEventListener('click', () => showCustomResponseForm());
     customResponseSaveBtn.addEventListener('click', onSaveCustomResponse);
     customResponseCancelBtn.addEventListener('click', hideCustomResponseForm);
+
+    idleMessages.forEach(msg => {
+        const option = document.createElement('option');
+        option.value = msg;
+        option.textContent = msg;
+        specificGreetingSelect.appendChild(option);
+    });
 
     ipcRenderer.on('go-idle-and-close', () => {
         if (!appContainer.classList.contains('visible')) return;
@@ -226,7 +284,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     
     animationContainer.className = 'idle';
     gifDisplay.src = idleVideo;
-    resultsDisplay.innerHTML = `<p class="fade-in-item">What's on your mind?</p>`;
+    resultsDisplay.innerHTML = `<p class="fade-in-item">${getIdleMessage()}</p>`;
     webLinkContainer.style.display = 'none';
     webLinkContainer.style.opacity = '0';
     searchBar.disabled = false;
@@ -284,6 +342,12 @@ function hexToHsl(H) {
     return { h, s, l };
 }
 
+function updateGreetingUI() {
+    const mode = idleGreetingModeSelect.value;
+    specificGreetingContainer.style.display = (mode === 'specific') ? 'block' : 'none';
+    customGreetingContainer.style.display = (mode === 'custom') ? 'block' : 'none';
+}
+
 async function loadAndApplySettings() {
     const settings = await ipcRenderer.invoke('get-settings');
     preferredVoiceName = settings.preferredVoice;
@@ -309,6 +373,19 @@ async function loadAndApplySettings() {
     const newHsl = hexToHsl(themeColor);
     const hueDifference = newHsl.h - defaultHue;
     document.documentElement.style.setProperty('--hue-rotate-deg', `${hueDifference}deg`);
+
+    pitch = settings.pitch || 1;
+    pitchSlider.value = pitch;
+    rate = settings.rate || 1;
+    rateSlider.value = rate;
+
+    idleGreetingMode = settings.idleGreetingMode || 'random';
+    specificIdleGreeting = settings.specificIdleGreeting || "What's on your mind?";
+    customIdleGreeting = settings.customIdleGreeting || '';
+    idleGreetingModeSelect.value = idleGreetingMode;
+    specificGreetingSelect.value = specificIdleGreeting;
+    customGreetingInput.value = customIdleGreeting;
+    updateGreetingUI();
 
     customResponses = settings.customResponses || [];
     renderCustomResponses();
@@ -417,6 +494,47 @@ function onThemeColorChanged(event) {
     document.documentElement.style.setProperty('--hue-rotate-deg', `${hueDifference}deg`);
 }
 
+function onPitchChanged(event) {
+    pitch = parseFloat(event.target.value);
+    ipcRenderer.send('set-setting', { key: 'pitch', value: pitch });
+}
+
+function onRateChanged(event) {
+    rate = parseFloat(event.target.value);
+    ipcRenderer.send('set-setting', { key: 'rate', value: rate });
+}
+
+function onResetVoiceSettings() {
+    const defaultVoice = availableVoices.find(v => v.name.includes("Zira")) || availableVoices[0];
+    
+    if (defaultVoice) {
+        preferredVoiceName = defaultVoice.name;
+        voiceSelect.value = preferredVoiceName;
+        currentVoice = defaultVoice;
+        ipcRenderer.send('set-setting', { key: 'preferredVoice', value: preferredVoiceName });
+    }
+
+    pitch = 1;
+    rate = 1;
+    pitchSlider.value = pitch;
+    rateSlider.value = rate;
+    ipcRenderer.send('set-setting', { key: 'pitch', value: pitch });
+    ipcRenderer.send('set-setting', { key: 'rate', value: rate });
+}
+
+function onResetAllSettings() {
+    const confirmation = confirm(
+        "Are you sure you want to reset EVERYTHING?\n\n" +
+        "This will erase all your custom settings, reminders, and custom responses. " +
+        "The application will restart. This action cannot be undone."
+    );
+
+    if (confirmation) {
+        ipcRenderer.send('reset-all-settings');
+    }
+}
+
+
 function onVoiceChanged() {
     const selectedVoiceName = voiceSelect.value;
     preferredVoiceName = selectedVoiceName;
@@ -443,6 +561,22 @@ function onSearchEngineChanged() {
 function onInstantResponseToggleChanged() {
     instantResponse = instantResponseToggle.checked;
     ipcRenderer.send('set-setting', { key: 'instantResponse', value: instantResponse });
+}
+
+function onIdleGreetingModeChanged(event) {
+    idleGreetingMode = event.target.value;
+    ipcRenderer.send('set-setting', { key: 'idleGreetingMode', value: idleGreetingMode });
+    updateGreetingUI();
+}
+
+function onSpecificIdleGreetingChanged(event) {
+    specificIdleGreeting = event.target.value;
+    ipcRenderer.send('set-setting', { key: 'specificIdleGreeting', value: specificIdleGreeting });
+}
+
+function onCustomIdleGreetingChanged(event) {
+    customIdleGreeting = event.target.value;
+    ipcRenderer.send('set-setting', { key: 'customIdleGreeting', value: customIdleGreeting });
 }
 
 function displayAndSpeak(text, callback, options = {}, isError = false) {
@@ -522,6 +656,8 @@ function speak(text, onSpeechEndCallback) {
     }
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.voice = currentVoice;
+    utterance.pitch = pitch;
+    utterance.rate = rate;
     utterance.onend = () => { if (onSpeechEndCallback) onSpeechEndCallback(); };
     utterance.onerror = () => { if (onSpeechEndCallback) onSpeechEndCallback(); };
     window.speechSynthesis.speak(utterance);
@@ -570,7 +706,7 @@ function setStateIdle() {
     if(document.activeElement === searchBar) {
         gifDisplay.src = listeningVideo;
     }
-    resultsDisplay.innerHTML = `<p class="fade-in-item">What's on your mind?</p>`;
+    resultsDisplay.innerHTML = `<p class="fade-in-item">${getIdleMessage()}</p>`;
     webLinkContainer.style.display = 'none';
     webLinkContainer.style.opacity = '0';
 

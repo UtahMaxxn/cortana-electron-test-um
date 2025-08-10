@@ -23,7 +23,12 @@ let settings = {
   instantResponse: false,
   themeColor: "#0078d7",
   customResponses: [],
-  isMovable: false
+  isMovable: false,
+  pitch: 1,
+  rate: 1,
+  idleGreetingMode: 'random',
+  specificIdleGreeting: "What's on your mind?",
+  customIdleGreeting: ""
 };
 const SETTINGS_FILE = path.join(app.getPath('userData'), 'settings.json');
 const REMINDERS_FILE = path.join(app.getPath('userData'), 'reminders.json');
@@ -285,6 +290,27 @@ function createWindow() {
         if (Array.isArray(responses)) {
             settings.customResponses = responses;
             await saveSettings();
+        }
+    });
+
+    ipcMain.on('reset-all-settings', async () => {
+        try {
+            reminders.forEach(reminder => {
+                if (reminder.timeout) clearTimeout(reminder.timeout);
+            });
+            reminders = [];
+
+            await fs.unlink(SETTINGS_FILE).catch(err => {
+                if (err.code !== 'ENOENT') throw err;
+            });
+            await fs.unlink(REMINDERS_FILE).catch(err => {
+                if (err.code !== 'ENOENT') throw err;
+            });
+
+            app.relaunch();
+            app.exit();
+        } catch (error) {
+            console.error('Failed to reset all settings:', error);
         }
     });
 
