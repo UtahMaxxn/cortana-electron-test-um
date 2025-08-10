@@ -285,7 +285,12 @@ window.addEventListener('DOMContentLoaded', async () => {
     
     animationContainer.className = 'idle';
     gifDisplay.src = idleVideo;
-    resultsDisplay.innerHTML = `<p class="fade-in-item">${getIdleMessage()}</p>`;
+
+    const p = document.createElement('p');
+    p.className = 'fade-in-item';
+    p.textContent = getIdleMessage();
+    resultsDisplay.appendChild(p);
+
     webLinkContainer.style.display = 'none';
     webLinkContainer.style.opacity = '0';
     searchBar.disabled = false;
@@ -324,7 +329,7 @@ function hexToHsl(H) {
     let h, s, l = (max + min) / 2;
 
     if (max === min) {
-        h = s = 0; // achromatic
+        h = s = 0;
     } else {
         const d = max - min;
         s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
@@ -709,7 +714,13 @@ function setStateIdle() {
     if(document.activeElement === searchBar) {
         gifDisplay.src = listeningVideo;
     }
-    resultsDisplay.innerHTML = `<p class="fade-in-item">${getIdleMessage()}</p>`;
+
+    resultsDisplay.innerHTML = '';
+    const p = document.createElement('p');
+    p.className = 'fade-in-item';
+    p.textContent = getIdleMessage();
+    resultsDisplay.appendChild(p);
+    
     webLinkContainer.style.display = 'none';
     webLinkContainer.style.opacity = '0';
 
@@ -844,7 +855,13 @@ async function getTimeForLocation(rawInput) {
 
         if (result.ambiguous) {
             text = "I found a few places with that name. Which one did you mean?";
-            resultsDisplay.innerHTML = `<p class="fade-in-item" style="margin-bottom: 10px;">${text}</p>`;
+            
+            resultsDisplay.innerHTML = '';
+            const p = document.createElement('p');
+            p.className = 'fade-in-item';
+            p.style.marginBottom = '10px';
+            p.textContent = text;
+            resultsDisplay.appendChild(p);
 
             result.options.forEach((option, index) => {
                 const btn = document.createElement('button');
@@ -1049,7 +1066,13 @@ async function handleOpenApplication(appName) {
         displayAndSpeak(responseText, onActionFinished, {}, false);
     } else {
         let responseText = "I found a few options. Which one did you mean?";
-        resultsDisplay.innerHTML = `<p class="fade-in-item" style="margin-bottom: 10px;">${responseText}</p>`;
+        
+        resultsDisplay.innerHTML = '';
+        const p = document.createElement('p');
+        p.className = 'fade-in-item';
+        p.style.marginBottom = '10px';
+        p.textContent = responseText;
+        resultsDisplay.appendChild(p);
 
         apps.slice(0, 5).forEach((app, index) => {
             const btn = document.createElement('button');
