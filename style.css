@@ -365,7 +365,7 @@ body.movable-mode #app-container {
 }
 
 #reminder-container,
-#custom-response-form-container {
+#custom-action-form-container {
     position: absolute;
     top: 0;
     left: 0;
@@ -381,7 +381,7 @@ body.movable-mode #app-container {
 }
 
 #reminder-container.visible,
-#custom-response-form-container.visible {
+#custom-action-form-container.visible {
     display: flex;
     animation: fadeIn 0.3s ease-in-out forwards;
 }
@@ -402,6 +402,9 @@ body.movable-mode #app-container {
 
 .reminder-form {
     width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
 }
 
 .reminder-label-gray {
@@ -413,8 +416,9 @@ body.movable-mode #app-container {
 
 #reminder-text-input,
 #reminder-time-input,
-#custom-response-trigger-input,
-#custom-response-response-input {
+#custom-action-trigger-input,
+.action-item-value-input,
+.action-item-type-select {
     width: 100%;
     background-color: transparent;
     border: 1px solid var(--primary-color);
@@ -429,8 +433,8 @@ body.movable-mode #app-container {
 
 #reminder-text-input::placeholder,
 #reminder-time-input::placeholder,
-#custom-response-trigger-input::placeholder,
-#custom-response-response-input::placeholder {
+#custom-action-trigger-input::placeholder,
+.action-item-value-input::placeholder {
     color: #74776f;
 }
 
@@ -461,23 +465,25 @@ body.movable-mode #app-container {
 }
 
 #reminder-save-btn,
-#custom-response-save-btn {
+#custom-action-save-btn {
     background-color: var(--primary-color);
     color: var(--primary-text-color);
 }
 
 #reminder-cancel-btn,
-#custom-response-cancel-btn {
+#custom-action-cancel-btn {
     background-color: #5a5a5a;
 }
 
-#reminder-save-btn:disabled {
+#reminder-save-btn:disabled,
+#custom-action-save-btn:disabled {
     background-color: #4c4c4c;
     color: #888;
     cursor: not-allowed;
 }
 
-#reminder-save-btn:disabled:hover {
+#reminder-save-btn:disabled:hover,
+#custom-action-save-btn:disabled:hover {
     filter: none;
 }
 
@@ -502,7 +508,7 @@ body.movable-mode #app-container {
 }
 
 .reminder-list-item,
-.custom-response-list-item {
+.custom-action-list-item {
     background-color: #2a2a2a;
     width: 100%;
     padding: 12px 15px;
@@ -515,7 +521,7 @@ body.movable-mode #app-container {
 }
 
 .reminder-text-container,
-.custom-response-text-container {
+.custom-action-text-container {
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -524,7 +530,7 @@ body.movable-mode #app-container {
 }
 
 .reminder-text,
-.custom-response-trigger {
+.custom-action-trigger {
     font-size: 15px;
     white-space: nowrap;
     overflow: hidden;
@@ -533,7 +539,7 @@ body.movable-mode #app-container {
 }
 
 .reminder-time,
-.custom-response-response {
+.custom-action-summary {
     font-size: 12px;
     color: #a2a2a2;
     white-space: nowrap;
@@ -542,7 +548,7 @@ body.movable-mode #app-container {
 }
 
 .reminder-item-actions,
-.custom-response-item-actions {
+.custom-action-item-actions {
     display: flex;
     gap: 8px;
     flex-shrink: 0;
@@ -632,15 +638,31 @@ body.movable-mode #app-container {
     position: relative;
 }
 
-.settings-content::-webkit-scrollbar {
-    display: none;
+.settings-content::-webkit-scrollbar,
+#action-sequence-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.settings-content::-webkit-scrollbar-track,
+#action-sequence-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.settings-content::-webkit-scrollbar-thumb,
+#action-sequence-list::-webkit-scrollbar-thumb {
+    background: #555;
+}
+
+.settings-content::-webkit-scrollbar-thumb:hover,
+#action-sequence-list::-webkit-scrollbar-thumb:hover {
+    background: #777;
 }
 
 .settings-main-content {
     display: block;
 }
 
-#custom-response-form-container {
+#custom-action-form-container {
     display: none;
     position: absolute;
     top: 45px;
@@ -648,6 +670,84 @@ body.movable-mode #app-container {
     height: calc(100% - 45px);
     z-index: 25;
 }
+
+#action-sequence-list {
+    flex-grow: 1;
+    overflow-y: auto;
+    margin-top: 8px;
+    margin-bottom: 8px;
+    padding-right: 4px;
+}
+
+.action-item {
+    background-color: #2a2a2a;
+    padding: 10px;
+    margin-bottom: 8px;
+    border-left: 3px solid var(--primary-color);
+}
+
+.action-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.action-item-label {
+    font-size: 12px;
+    color: #a2a2a2;
+    text-transform: uppercase;
+}
+
+.action-item-controls button {
+    background: none;
+    border: none;
+    color: #a2a2a2;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 2px 4px;
+    font-family: 'Segoe MDL2 Assets', 'Segoe UI Symbol';
+}
+.action-item-controls button:hover {
+    color: white;
+}
+.action-item-controls button.delete:hover {
+    color: #e74c3c;
+}
+
+.action-item-body {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.action-item-type-select {
+    flex-basis: 120px;
+    flex-shrink: 0;
+    font-size: 14px;
+    padding: 8px;
+    margin-bottom: 0;
+}
+
+.action-item-value-input {
+    flex-grow: 1;
+    font-size: 14px;
+    padding: 8px;
+    margin-bottom: 0;
+}
+
+.action-item-browse-btn {
+    padding: 8px 10px;
+    font-size: 14px;
+    background-color: #444;
+    border: 1px solid #888;
+    color: white;
+    cursor: pointer;
+}
+.action-item-browse-btn:hover {
+    background-color: #555;
+}
+
 
 .settings-section h2 {
     font-size: 11px;
@@ -686,7 +786,8 @@ body.movable-mode #app-container {
 #voice-select,
 #search-engine-select,
 #idle-greeting-mode-select,
-#specific-greeting-select {
+#specific-greeting-select,
+.action-item-type-select {
     background-color: transparent;
     color: white;
     border: 1px solid #888;
@@ -718,7 +819,7 @@ body.movable-mode #app-container {
 
 #voice-select:hover, #search-engine-select:hover,
 #idle-greeting-mode-select:hover, #specific-greeting-select:hover,
-.settings-text-input:hover {
+.settings-text-input:hover, .action-item-type-select:hover {
     background-color: #333;
 }
 .settings-text-input:focus {
@@ -783,6 +884,12 @@ body.movable-mode #app-container {
     margin-top: 4px;
     padding-bottom: 10px;
     border-bottom: 1px solid #333;
+}
+
+#action-sequence-warning {
+    color: #e74c3c;
+    border: none;
+    padding-bottom: 0;
 }
 
 .toggle-switch {

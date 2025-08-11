@@ -91,9 +91,9 @@
                                 <p id="voice-warning" class="setting-warning">Cortana's default voice (Microsoft Zira Desktop) is not available.</p>
                             </div>
                             <div class="settings-section">
-                                <h2>Custom Responses</h2>
-                                <div id="custom-responses-list" class="reminder-list"></div>
-                                <button id="add-custom-response-btn" class="settings-button">Add New Response</button>
+                                <h2>Custom Actions</h2>
+                                <div id="custom-actions-list" class="reminder-list"></div>
+                                <button id="add-custom-action-btn" class="settings-button">Add New Action</button>
                             </div>
                             <div class="settings-section">
                                 <h2>Search</h2>
@@ -139,16 +139,18 @@
                                 <button id="reset-all-btn" class="settings-button danger">Reset All Settings & Reminders</button>
                             </div>
                         </div>
-                        <div id="custom-response-form-container">
-                            <p class="reminder-title">Custom Response</p>
+                        <div id="custom-action-form-container">
+                            <p class="reminder-title">Custom Action</p>
                              <div class="reminder-form">
-                                <label for="custom-response-trigger-input" class="reminder-label-gray">When I say...</label>
-                                <input type="text" id="custom-response-trigger-input" placeholder="e.g., who made you?">
-                                <label for="custom-response-response-input" class="reminder-label-gray">You say...</label>
-                                <input type="text" id="custom-response-response-input" placeholder="e.g., I was made by BlueySoft">
+                                <label for="custom-action-trigger-input" class="reminder-label-gray">When I say...</label>
+                                <input type="text" id="custom-action-trigger-input" placeholder="e.g., who made you?">
+                                <label class="reminder-label-gray" style="margin-top: 15px;">Cortana will...</label>
+                                <div id="action-sequence-list"></div>
+                                <button id="add-action-to-sequence-btn" class="settings-button" style="margin-top: 5px;">Add Step</button>
+                                <p id="action-sequence-warning" class="setting-warning"></p>
                                 <div class="reminder-actions">
-                                    <button id="custom-response-save-btn">Save</button>
-                                    <button id="custom-response-cancel-btn">Cancel</button>
+                                    <button id="custom-action-save-btn">Save</button>
+                                    <button id="custom-action-cancel-btn">Cancel</button>
                                 </div>
                             </div>
                         </div>

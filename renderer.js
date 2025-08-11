@@ -12,12 +12,12 @@ let reminderContainer, reminderTextInput, reminderTimeInput, reminderSaveBtn, re
 
 let settingsContainer, settingsBtn, settingsBackBtn, voiceSelect, startupToggle, startupWarning, voiceWarning, searchEngineSelect, instantResponseToggle, themeColorPicker, movableToggle, pitchSlider, rateSlider, resetVoiceBtn, resetAllBtn;
 let idleGreetingModeSelect, specificGreetingContainer, specificGreetingSelect, customGreetingContainer, customGreetingInput;
-let customResponseFormContainer, customResponseTriggerInput, customResponseResponseInput, customResponseSaveBtn, customResponseCancelBtn, customResponsesList, addCustomResponseBtn;
+let customActionFormContainer, customActionTriggerInput, customActionSaveBtn, customActionCancelBtn, customActionsList, addCustomActionBtn, actionSequenceList, actionSequenceWarning;
 
 let availableVoices = [];
-let customResponses = [];
+let customActions = [];
 let currentVoice = null;
-let editingResponseIndex = null;
+let editingActionIndex = null;
 let preferredVoiceName = "Microsoft Zira Desktop";
 let currentSearchEngine = "bing";
 let instantResponse = false;
@@ -160,13 +160,14 @@ window.addEventListener('DOMContentLoaded', async () => {
     customGreetingContainer = document.getElementById('custom-greeting-container');
     customGreetingInput = document.getElementById('custom-greeting-input');
 
-    customResponseFormContainer = document.getElementById('custom-response-form-container');
-    customResponseTriggerInput = document.getElementById('custom-response-trigger-input');
-    customResponseResponseInput = document.getElementById('custom-response-response-input');
-    customResponseSaveBtn = document.getElementById('custom-response-save-btn');
-    customResponseCancelBtn = document.getElementById('custom-response-cancel-btn');
-    customResponsesList = document.getElementById('custom-responses-list');
-    addCustomResponseBtn = document.getElementById('add-custom-response-btn');
+    customActionFormContainer = document.getElementById('custom-action-form-container');
+    customActionTriggerInput = document.getElementById('custom-action-trigger-input');
+    customActionSaveBtn = document.getElementById('custom-action-save-btn');
+    customActionCancelBtn = document.getElementById('custom-action-cancel-btn');
+    customActionsList = document.getElementById('custom-actions-list');
+    addCustomActionBtn = document.getElementById('add-custom-action-btn');
+    actionSequenceList = document.getElementById('action-sequence-list');
+    actionSequenceWarning = document.getElementById('action-sequence-warning');
 
     document.getElementById('settings-btn-icon').src = settingsIconPng;
     document.getElementById('close-btn-icon').src = closeIconPng;
@@ -219,8 +220,8 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     settingsBtn.addEventListener('click', showSettingsUI);
     settingsBackBtn.addEventListener('click', () => {
-        if (customResponseFormContainer.classList.contains('visible')) {
-            hideCustomResponseForm();
+        if (customActionFormContainer.classList.contains('visible')) {
+            hideCustomActionForm();
         } else {
             setStateIdle();
         }
@@ -240,9 +241,15 @@ window.addEventListener('DOMContentLoaded', async () => {
     specificGreetingSelect.addEventListener('change', onSpecificIdleGreetingChanged);
     customGreetingInput.addEventListener('input', onCustomIdleGreetingChanged);
 
-    addCustomResponseBtn.addEventListener('click', () => showCustomResponseForm());
-    customResponseSaveBtn.addEventListener('click', onSaveCustomResponse);
-    customResponseCancelBtn.addEventListener('click', hideCustomResponseForm);
+    addCustomActionBtn.addEventListener('click', () => showCustomActionForm());
+    customActionSaveBtn.addEventListener('click', onSaveCustomAction);
+    customActionCancelBtn.addEventListener('click', hideCustomActionForm);
+    document.getElementById('add-action-to-sequence-btn').addEventListener('click', () => {
+        const currentActions = getCurrentActionsFromForm();
+        const newAction = { type: 'open_app', value: '' };
+        renderActionSequenceUI([...currentActions, newAction]);
+        actionSequenceList.scrollTop = actionSequenceList.scrollHeight;
+    });
 
     idleMessages.forEach(msg => {
         const option = document.createElement('option');
@@ -272,10 +279,13 @@ window.addEventListener('DOMContentLoaded', async () => {
     });
 
     ipcRenderer.on('command-failed', (event, { command }) => {
+        let errorText = `Sorry, I had trouble with that command.`;
         if (command === 'open-application') {
-            const errorText = `Sorry, I had trouble opening that. Make sure it's installed correctly.`;
-            displayAndSpeak(errorText, onActionFinished, {}, true);
+            errorText = `Sorry, I had trouble opening that. Make sure it's installed correctly.`;
+        } else if (command === 'run-command') {
+            errorText = `Sorry, that command failed to run.`;
         }
+        displayAndSpeak(errorText, onActionFinished, {}, true);
     });
 
     ipcRenderer.on('show-settings-ui', showSettingsUI);
@@ -306,7 +316,7 @@ function showSettingsUI() {
 
     settingsContainer.classList.add('visible');
     document.querySelector('.settings-main-content').style.display = 'block';
-    customResponseFormContainer.classList.remove('visible');
+    customActionFormContainer.classList.remove('visible');
 
     searchBar.disabled = true;
     searchBar.placeholder = 'Unavailable...';
@@ -393,100 +403,101 @@ async function loadAndApplySettings() {
     customGreetingInput.value = customIdleGreeting;
     updateGreetingUI();
 
-    customResponses = settings.customResponses || [];
-    renderCustomResponses();
+    customActions = settings.customActions || [];
+    renderCustomActions();
 }
 
-function renderCustomResponses() {
-    customResponsesList.innerHTML = '';
-    if (customResponses.length === 0) {
-        customResponsesList.innerHTML = `<p class="no-items-message">No custom responses yet.</p>`;
+function renderCustomActions() {
+    customActionsList.innerHTML = '';
+    if (customActions.length === 0) {
+        customActionsList.innerHTML = `<p class="no-items-message">No custom actions yet.</p>`;
     } else {
-        customResponses.forEach((item, index) => {
+        customActions.forEach((item, index) => {
             const itemContainer = document.createElement('div');
-            itemContainer.className = 'custom-response-list-item fade-in-item';
+            itemContainer.className = 'custom-action-list-item fade-in-item';
     
             const textContainer = document.createElement('div');
-            textContainer.className = 'custom-response-text-container';
+            textContainer.className = 'custom-action-text-container';
     
             const triggerSpan = document.createElement('span');
-            triggerSpan.className = 'custom-response-trigger';
+            triggerSpan.className = 'custom-action-trigger';
             triggerSpan.textContent = item.trigger;
     
-            const responseSpan = document.createElement('span');
-            responseSpan.className = 'custom-response-response';
-            responseSpan.textContent = item.response;
+            const summarySpan = document.createElement('span');
+            summarySpan.className = 'custom-action-summary';
+            summarySpan.textContent = item.actions.map(a => a.type.replace('_', ' ')).join(' → ');
     
             const actionsContainer = document.createElement('div');
-            actionsContainer.className = 'custom-response-item-actions';
+            actionsContainer.className = 'custom-action-item-actions';
     
             const editBtn = document.createElement('button');
             editBtn.textContent = 'Edit';
             editBtn.className = 'reminder-action-btn';
-            editBtn.onclick = () => showCustomResponseForm({ index, data: item });
+            editBtn.onclick = () => showCustomActionForm({ index, data: item });
     
             const deleteBtn = document.createElement('button');
             deleteBtn.textContent = 'Delete';
             deleteBtn.className = 'reminder-action-btn delete';
             deleteBtn.onclick = () => {
-                customResponses.splice(index, 1);
-                saveCustomResponses();
-                renderCustomResponses();
+                customActions.splice(index, 1);
+                saveCustomActions();
+                renderCustomActions();
             };
     
             textContainer.appendChild(triggerSpan);
-            textContainer.appendChild(responseSpan);
+            textContainer.appendChild(summarySpan);
             actionsContainer.appendChild(editBtn);
             actionsContainer.appendChild(deleteBtn);
             itemContainer.appendChild(textContainer);
             itemContainer.appendChild(actionsContainer);
-            customResponsesList.appendChild(itemContainer);
+            customActionsList.appendChild(itemContainer);
         });
     }
 }
 
-function showCustomResponseForm(options = {}) {
+function showCustomActionForm(options = {}) {
     const { index, data } = options;
     document.querySelector('.settings-main-content').style.display = 'none';
-    customResponseFormContainer.classList.add('visible');
+    customActionFormContainer.classList.add('visible');
     
     if (data) {
-        editingResponseIndex = index;
-        customResponseTriggerInput.value = data.trigger;
-        customResponseResponseInput.value = data.response;
+        editingActionIndex = index;
+        customActionTriggerInput.value = data.trigger;
+        renderActionSequenceUI(data.actions);
     } else {
-        editingResponseIndex = null;
-        customResponseTriggerInput.value = '';
-        customResponseResponseInput.value = '';
+        editingActionIndex = null;
+        customActionTriggerInput.value = '';
+        renderActionSequenceUI([]);
     }
-    customResponseTriggerInput.focus();
+    validateAndApplyActionFormState();
+    customActionTriggerInput.focus();
 }
 
-function hideCustomResponseForm() {
-    customResponseFormContainer.classList.remove('visible');
+function hideCustomActionForm() {
+    customActionFormContainer.classList.remove('visible');
     document.querySelector('.settings-main-content').style.display = 'block';
-    editingResponseIndex = null;
+    editingActionIndex = null;
 }
 
-function onSaveCustomResponse() {
-    const trigger = customResponseTriggerInput.value.trim();
-    const response = customResponseResponseInput.value.trim();
+function onSaveCustomAction() {
+    const trigger = customActionTriggerInput.value.trim();
+    const actions = getCurrentActionsFromForm();
 
-    if (!trigger || !response) return;
+    if (!trigger || actions.length === 0) return;
 
-    const newResponse = { trigger, response };
-    if (editingResponseIndex !== null) {
-        customResponses[editingResponseIndex] = newResponse;
+    const newAction = { trigger, actions };
+    if (editingActionIndex !== null) {
+        customActions[editingActionIndex] = newAction;
     } else {
-        customResponses.push(newResponse);
+        customActions.push(newAction);
     }
-    saveCustomResponses();
-    renderCustomResponses();
-    hideCustomResponseForm();
+    saveCustomActions();
+    renderCustomActions();
+    hideCustomActionForm();
 }
 
-function saveCustomResponses() {
-    ipcRenderer.send('set-custom-responses', customResponses);
+function saveCustomActions() {
+    ipcRenderer.send('set-custom-actions', customActions);
 }
 
 function onThemeColorChanged(event) {
@@ -531,7 +542,7 @@ function onResetVoiceSettings() {
 function onResetAllSettings() {
     const confirmation = confirm(
         "Are you sure you want to reset EVERYTHING?\n\n" +
-        "This will erase all your custom settings, reminders, and custom responses. " +
+        "This will erase all your custom settings, reminders, and custom actions. " +
         "The application will restart. This action cannot be undone."
     );
 
@@ -1178,9 +1189,9 @@ function processQuery(query) {
     gifDisplay.src = speakingVideo;
     const lowerCaseQuery = query.toLowerCase();
 
-    const customResponse = customResponses.find(r => r.trigger && lowerCaseQuery.includes(r.trigger.toLowerCase()));
-    if (customResponse && customResponse.response) {
-        displayAndSpeak(customResponse.response, onActionFinished, {}, false);
+    const customAction = customActions.find(a => a.trigger && lowerCaseQuery.includes(a.trigger.toLowerCase()));
+    if (customAction && customAction.actions.length > 0) {
+        executeActionSequence(customAction.actions);
         return;
     }
 
@@ -1383,5 +1394,213 @@ function onSearch() {
         requestSound.onended = () => {
             processQuery(query);
         };
+    }
+}
+
+async function executeActionSequence(actions) {
+    for (const action of actions) {
+        try {
+            switch (action.type) {
+                case 'speak':
+                    await new Promise(resolve => {
+                        displayAndSpeak(action.value, resolve, {}, false);
+                    });
+                    break;
+                case 'open_app':
+                    ipcRenderer.send('open-path', action.value);
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    break;
+                case 'open_url':
+                    ipcRenderer.send('open-external-link', action.value);
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    break;
+                case 'play_sound':
+                    await new Promise((resolve, reject) => {
+                        const audio = new Audio(action.value);
+                        audio.onended = resolve;
+                        audio.onerror = reject;
+                        audio.play();
+                    });
+                    break;
+                case 'run_command':
+                    ipcRenderer.send('run-command', action.value);
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    break;
+            }
+        } catch (error) {
+            console.error(`Error executing action ${action.type}:`, error);
+            displayAndSpeak(`Sorry, I had a problem with the action: ${action.type}.`, onActionFinished, {}, true);
+            return;
+        }
+    }
+    onActionFinished();
+}
+
+function renderActionSequenceUI(actions) {
+    actionSequenceList.innerHTML = '';
+    
+    actions.forEach((action, index) => {
+        const isLastItem = index === actions.length - 1;
+        const actionItem = createActionItemUI(action, index, isLastItem);
+        actionSequenceList.appendChild(actionItem);
+    });
+    
+    validateAndApplyActionFormState();
+}
+
+function createActionItemUI(action, index, isLastItem) {
+    const itemDiv = document.createElement('div');
+    itemDiv.className = 'action-item';
+    itemDiv.dataset.index = index;
+
+    const header = document.createElement('div');
+    header.className = 'action-item-header';
+    
+    const label = document.createElement('span');
+    label.className = 'action-item-label';
+    label.textContent = `Step ${index + 1}`;
+
+    const controls = document.createElement('div');
+    controls.className = 'action-item-controls';
+    
+    if (index > 0) {
+        const upBtn = document.createElement('button');
+        upBtn.innerHTML = '&#xE70E;'; 
+        upBtn.onclick = () => moveAction(index, -1);
+        controls.appendChild(upBtn);
+    }
+
+    if (!isLastItem) {
+        const downBtn = document.createElement('button');
+        downBtn.innerHTML = '&#xE70D;';
+        downBtn.onclick = () => moveAction(index, 1);
+        controls.appendChild(downBtn);
+    }
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.innerHTML = '&#xE74D;';
+    deleteBtn.className = 'delete';
+    deleteBtn.onclick = () => removeAction(index);
+    controls.appendChild(deleteBtn);
+    
+    header.appendChild(label);
+    header.appendChild(controls);
+
+    const body = document.createElement('div');
+    body.className = 'action-item-body';
+
+    const typeSelect = document.createElement('select');
+    typeSelect.className = 'action-item-type-select';
+    const types = {
+        'speak': 'Speak Text',
+        'open_app': 'Open App/File',
+        'open_url': 'Open URL',
+        'play_sound': 'Play Sound',
+        'run_command': 'Run Command'
+    };
+
+    if (index > 0) {
+        delete types.speak;
+    }
+
+    for (const [value, text] of Object.entries(types)) {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = text;
+        if (value === action.type) option.selected = true;
+        typeSelect.appendChild(option);
+    }
+    typeSelect.onchange = () => {
+        const actions = getCurrentActionsFromForm();
+        renderActionSequenceUI(actions);
+    };
+
+    const valueInput = document.createElement('input');
+    valueInput.type = 'text';
+    valueInput.className = 'action-item-value-input';
+    valueInput.value = action.value || '';
+    valueInput.placeholder = 'Enter value...';
+    valueInput.oninput = validateAndApplyActionFormState;
+
+    body.appendChild(typeSelect);
+    body.appendChild(valueInput);
+    
+    if (action.type === 'open_app' || action.type === 'play_sound') {
+        const browseBtn = document.createElement('button');
+        browseBtn.textContent = '...';
+        browseBtn.className = 'action-item-browse-btn';
+        browseBtn.onclick = async () => {
+            let filters = [];
+            if (action.type === 'open_app') {
+                filters = [{ name: 'Applications', extensions: ['exe', 'lnk'] }];
+            } else if (action.type === 'play_sound') {
+                filters = [{ name: 'Audio Files', extensions: ['mp3', 'wav', 'ogg'] }];
+            }
+            const result = await ipcRenderer.invoke('show-open-dialog', { 
+                properties: ['openFile'],
+                filters: filters
+            });
+            if (!result.canceled && result.filePaths.length > 0) {
+                valueInput.value = result.filePaths[0];
+                validateAndApplyActionFormState();
+            }
+        };
+        body.appendChild(browseBtn);
+    }
+
+    itemDiv.appendChild(header);
+    itemDiv.appendChild(body);
+    return itemDiv;
+}
+
+function getCurrentActionsFromForm() {
+    const actionItems = actionSequenceList.querySelectorAll('.action-item');
+    return Array.from(actionItems).map(item => ({
+        type: item.querySelector('.action-item-type-select').value,
+        value: item.querySelector('.action-item-value-input').value
+    }));
+}
+
+function moveAction(index, direction) {
+    let actions = getCurrentActionsFromForm();
+    if (index + direction < 0 || index + direction >= actions.length) return;
+    [actions[index], actions[index + direction]] = [actions[index + direction], actions[index]];
+    renderActionSequenceUI(actions);
+}
+
+function removeAction(index) {
+    let actions = getCurrentActionsFromForm();
+    actions.splice(index, 1);
+    renderActionSequenceUI(actions);
+}
+
+function validateAndApplyActionFormState() {
+    const actions = getCurrentActionsFromForm();
+    const triggerText = customActionTriggerInput.value.trim();
+    let isValid = true;
+    let warningMessage = '';
+
+    const speakActionIndex = actions.findIndex(a => a.type === 'speak');
+    if (speakActionIndex > 0) {
+        isValid = false;
+        warningMessage = 'The "Speak Text" action can only be the first step.';
+    }
+
+    if (actions.some(a => !a.value.trim())) {
+        isValid = false;
+        if (!warningMessage) warningMessage = 'All action steps must have a value.';
+    }
+
+    if (!triggerText) {
+        isValid = false;
+    }
+
+    customActionSaveBtn.disabled = !isValid;
+    actionSequenceWarning.textContent = warningMessage;
+    actionSequenceWarning.style.display = warningMessage ? 'block' : 'none';
+
+    const addStepButton = document.getElementById('add-action-to-sequence-btn');
+    if (addStepButton) {
+        addStepButton.disabled = false;
     }
 }

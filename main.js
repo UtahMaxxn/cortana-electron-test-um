@@ -1,4 +1,4 @@
-const { app, BrowserWindow, screen, ipcMain, shell, Notification, Tray, Menu } = require('electron');
+const { app, BrowserWindow, screen, ipcMain, shell, Notification, Tray, Menu, dialog } = require('electron');
 const path = require('path');
 const { exec } = require('child_process');
 const fs = require('fs/promises');
@@ -22,7 +22,7 @@ let settings = {
   searchEngine: "bing",
   instantResponse: false,
   themeColor: "#0078d7",
-  customResponses: [],
+  customActions: [],
   isMovable: false,
   pitch: 1,
   rate: 1,
@@ -286,9 +286,9 @@ function createWindow() {
         }
     });
 
-    ipcMain.on('set-custom-responses', async (event, responses) => {
-        if (Array.isArray(responses)) {
-            settings.customResponses = responses;
+    ipcMain.on('set-custom-actions', async (event, actions) => {
+        if (Array.isArray(actions)) {
+            settings.customActions = actions;
             await saveSettings();
         }
     });
@@ -299,6 +299,7 @@ function createWindow() {
                 if (reminder.timeout) clearTimeout(reminder.timeout);
             });
             reminders = [];
+            settings.customActions = [];
 
             await fs.unlink(SETTINGS_FILE).catch(err => {
                 if (err.code !== 'ENOENT') throw err;
@@ -355,6 +356,21 @@ function createWindow() {
         shell.openPath(fsPath).catch(err => {
             console.error(`Failed to open path ${fsPath}:`, err);
         });
+    });
+
+    ipcMain.on('run-command', (event, command) => {
+        exec(command, (error) => {
+            if (error) {
+                console.error(`Failed to execute command "${command}":`, error);
+                mainWindow.webContents.send('command-failed', { command: 'run-command' });
+            }
+        });
+    });
+
+    ipcMain.handle('show-open-dialog', async (event, options) => {
+        if (!mainWindow) return;
+        const result = await dialog.showOpenDialog(mainWindow, options);
+        return result;
     });
 
     ipcMain.on('set-reminder', async (event, { reminder, reminderTime }) => {
@@ -455,4 +471,4 @@ function createWindow() {
             showWindow();
         }
     });
-}
+}s
