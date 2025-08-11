@@ -1,5 +1,6 @@
 const { app, BrowserWindow, screen, ipcMain, shell, Notification, Tray, Menu, dialog } = require('electron');
 const path = require('path');
+const https = require('https');
 const { exec } = require('child_process');
 const fs = require('fs/promises');
 const cityTimezones = require('city-timezones');
@@ -431,38 +432,56 @@ function createWindow() {
     });
 
     ipcMain.handle('get-time-for-location', async (event, cityInput) => {
-        try {
-            const matches = cityTimezones.lookupViaCity(cityInput.trim());
-            if (!matches || matches.length === 0) {
-                throw new Error(`Could not find timezone for city: ${cityInput}`);
+        return new Promise((resolve, reject) => {
+            try {
+                const matches = cityTimezones.lookupViaCity(cityInput.trim());
+                if (!matches || matches.length === 0) {
+                    return reject(new Error(`Could not find timezone for city: ${cityInput}`));
+                }
+
+                const timezone = matches[0].timezone;
+                const url = `https://timeapi.io/api/Time/current/zone?timeZone=${encodeURIComponent(timezone)}`;
+
+                https.get(url, (res) => {
+                    if (res.statusCode !== 200) {
+                        res.resume();
+                        return reject(new Error(`Time API returned status ${res.statusCode}`));
+                    }
+
+                    let data = '';
+                    res.on('data', (chunk) => {
+                        data += chunk;
+                    });
+                    res.on('end', () => {
+                        try {
+                            const jsonData = JSON.parse(data);
+                            if (!jsonData.dateTime) {
+                                return reject(new Error("Missing dateTime in API response"));
+                            }
+                            const dateTime = new Date(jsonData.dateTime);
+                            const formattedTime = dateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                            resolve({
+                                city: matches[0].city,
+                                country: matches[0].country,
+                                timeZone: timezone,
+                                time: formattedTime,
+                            });
+                        } catch (parseError) {
+                            console.error(`Time lookup failed for "${cityInput}" (parsing):`, parseError);
+                            reject(new Error(`Failed to parse time data for ${cityInput}`));
+                        }
+                    });
+                }).on('error', (err) => {
+                    console.error(`Time lookup failed for "${cityInput}" (network):`, err);
+                    reject(new Error(`Failed to get time for ${cityInput}`));
+                });
+
+            } catch (error) {
+                console.error(`Time lookup failed for "${cityInput}" (setup):`, error);
+                reject(new Error(`Failed to get time for ${cityInput}`));
             }
-
-            const timezone = matches[0].timezone;
-            const url = `https://timeapi.io/api/Time/current/zone?timeZone=${encodeURIComponent(timezone)}`;
-            const response = await fetch(url);
-            if (!response.ok) {
-                throw new Error(`Time API returned status ${response.status}`);
-            }
-
-            const data = await response.json();
-            if (!data.dateTime) {
-                throw new Error("Missing dateTime in API response");
-            }
-
-            const dateTime = new Date(data.dateTime);
-            const formattedTime = dateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-            return {
-                city: matches[0].city,
-                country: matches[0].country,
-                timeZone: timezone,
-                time: formattedTime,
-            };
-
-        } catch (error) {
-            console.error(`Time lookup failed for "${cityInput}":`, error);
-            throw new Error(`Failed to get time for ${cityInput}`);
-        }
+        });
     });
   
     mainWindow.loadFile('index.html');
@@ -471,4 +490,4 @@ function createWindow() {
             showWindow();
         }
     });
-}s
+}
