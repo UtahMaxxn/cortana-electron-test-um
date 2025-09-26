@@ -1122,6 +1122,7 @@ function onSaveReminder() {
     }
 }
 
+
 async function handleOpenApplication(appName) {
     displayAndSpeak(`Looking for ${appName}...`, onActionFinished, {}, false);
 
@@ -1283,8 +1284,8 @@ function processQuery(query) {
         return;
     }
 
-    const reminderMatch = lowerCaseQuery.match(/^remind me(?: to)?\s(.+)/i);
-    const genericReminderMatch = lowerCaseQuery.match(/^(set a reminder|remind me)$/i);
+    const reminderMatch = lowerCaseQuery.match(/^(?:remind me(?: to)?|create a reminder(?: for)?)\s(.+)/i);
+    const genericReminderMatch = lowerCaseQuery.match(/^(set a reminder|create a reminder|remind me)$/i);
     if (reminderMatch || genericReminderMatch) {
         let reminderText = '';
         let timeText = '';
