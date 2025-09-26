@@ -1,176 +1,248 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <meta charset="UTF-8">
+  <head>
+    <meta charset="UTF-8" />
     <title>Cortana Client</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
     <div id="app-container">
-        <div class="main-container">
-            <div id="drag-bar"></div>
-            <div id="settings-btn" title="Settings">
-                <img id="settings-btn-icon" alt="Settings Icon">
-            </div>
-            <div id="close-btn" title="Close Application">
-                <img id="close-btn-icon" alt="Close Icon">
-            </div>
-            <div id="cortana-container" class="content-pane">
-                <div id="animation-container">
-                    <img id="gif-display">
-                    <div id="content-wrapper">
-                        <div id="results-display"></div>
-                        <div id="web-link-container">
-                            <hr class="divider">
-                            <a href="#" id="web-link">
-                                <img id="web-icon" alt="Web Icon">
-                                <span>See more results on the web</span>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-                <div id="reminder-container">
-                    <img id="reminder-icon" alt="Cortana Icon">
-                    <p class="reminder-title">What do you want to be reminded about?</p>
-                    <div class="reminder-form">
-                        <label for="reminder-text-input" class="reminder-label-gray">Remind me to...</label>
-                        <input type="text" id="reminder-text-input" placeholder="e.g., take out the trash">
-                        <label for="reminder-time-input" class="reminder-label-gray">On this date and time</label>
-                        <input type="datetime-local" id="reminder-time-input">
-                        <div class="reminder-actions">
-                            <button id="reminder-save-btn">Save</button>
-                            <button id="reminder-cancel-btn">Cancel</button>
-                        </div>
-                    </div>
-                </div>
-                <div id="settings-container">
-                    <div class="settings-header">
-                        <button id="settings-back-btn">&#xE0A6;</button>
-                        <h1>Settings</h1>
-                    </div>
-                    <div class="settings-content">
-                        <div class="settings-main-content">
-                            <div class="settings-section">
-                                <h2>Personalisation</h2>
-                                <div class="setting-item">
-                                    <label for="voice-select">Voice</label>
-                                    <select id="voice-select"></select>
-                                </div>
-                                <div class="setting-item">
-                                    <label for="pitch-slider">Speech Pitch</label>
-                                    <input type="range" id="pitch-slider" min="0.1" max="2" step="0.1" class="speech-slider">
-                                </div>
-                                <div class="setting-item">
-                                    <label for="rate-slider">Speech Speed</label>
-                                    <input type="range" id="rate-slider" min="0.5" max="2" step="0.1" class="speech-slider">
-                                </div>
-                                <div class="setting-item">
-                                    <label for="theme-color-picker">Theme Colour</label>
-                                    <input type="color" id="theme-color-picker" value="#0078d7">
-                                </div>
-                                <div class="setting-item">
-                                    <label for="idle-greeting-mode-select">Idle Greeting</label>
-                                    <select id="idle-greeting-mode-select">
-                                        <option value="random">Random</option>
-                                        <option value="specific">Specific</option>
-                                        <option value="custom">Custom</option>
-                                    </select>
-                                </div>
-                                <div id="specific-greeting-container" class="setting-sub-item">
-                                    <div class="setting-item">
-                                        <label for="specific-greeting-select">Greeting</label>
-                                        <select id="specific-greeting-select"></select>
-                                    </div>
-                                </div>
-                                <div id="custom-greeting-container" class="setting-sub-item">
-                                     <div class="setting-item">
-                                        <label for="custom-greeting-input">Custom Text</label>
-                                        <input type="text" id="custom-greeting-input" class="settings-text-input" placeholder="Hello!">
-                                    </div>
-                                </div>
-                                <p id="voice-warning" class="setting-warning">Cortana's default voice (Microsoft Zira Desktop) is not available.</p>
-                            </div>
-                            <div class="settings-section">
-                                <h2>Custom Actions</h2>
-                                <div id="custom-actions-list" class="reminder-list"></div>
-                                <button id="add-custom-action-btn" class="settings-button">Add New Action</button>
-                            </div>
-                            <div class="settings-section">
-                                <h2>Search</h2>
-                                <div class="setting-item">
-                                    <label for="search-engine-select">Search Engine</label>
-                                    <select id="search-engine-select">
-                                        <option value="bing">Bing</option>
-                                        <option value="google">Google</option>
-                                        <option value="duckduckgo">DuckDuckGo</option>
-                                        <option value="brave">Brave</option>
-                                        <option value="ecosia">Ecosia</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="settings-section">
-                                <h2>System</h2>
-                                <div class="setting-item">
-                                    <label for="startup-toggle">Start with Windows</label>
-                                    <label class="toggle-switch">
-                                        <input type="checkbox" id="startup-toggle">
-                                        <span class="slider"></span>
-                                    </label>
-                                </div>
-                                <p id="startup-warning" class="setting-warning">Reminders may not work as expected until Cortana is launched manually.</p>
-                                <div class="setting-item">
-                                    <label for="movable-toggle">Movable Window</label>
-                                    <label class="toggle-switch">
-                                        <input type="checkbox" id="movable-toggle">
-                                        <span class="slider"></span>
-                                    </label>
-                                </div>
-                                <div class="setting-item">
-                                    <label for="instant-response-toggle">Instant Response</label>
-                                    <label class="toggle-switch">
-                                        <input type="checkbox" id="instant-response-toggle">
-                                        <span class="slider"></span>
-                                    </label>
-                                </div>
-                            </div>
-                            <div class="settings-section">
-                                <h2>Advanced</h2>
-                                <button id="reset-voice-btn" class="settings-button">Reset Voice Settings</button>
-                                <button id="reset-all-btn" class="settings-button danger">Reset All Settings & Reminders</button>
-                            </div>
-                        </div>
-                        <div id="custom-action-form-container">
-                            <p class="reminder-title">Custom Action</p>
-                             <div class="reminder-form">
-                                <label for="custom-action-trigger-input" class="reminder-label-gray">When I say...</label>
-                                <input type="text" id="custom-action-trigger-input" placeholder="e.g., who made you?">
-                                <label class="reminder-label-gray" style="margin-top: 15px;">Cortana will...</label>
-                                <div id="action-sequence-list"></div>
-                                <button id="add-action-to-sequence-btn" class="settings-button" style="margin-top: 5px;">Add Step</button>
-                                <p id="action-sequence-warning" class="setting-warning"></p>
-                                <div class="reminder-actions">
-                                    <button id="custom-action-save-btn">Save</button>
-                                    <button id="custom-action-cancel-btn">Cancel</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+      <div class="main-container">
+        <div id="drag-bar"></div>
+        <div id="settings-btn" title="Settings">
+          <img id="settings-btn-icon" alt="Settings Icon" />
         </div>
-        <div class="search-container">
-            <div class="search-input-wrapper">
-                <img id="search-icon" alt="Cortana Icon">
-                <input type="text" id="search-bar" placeholder="Type here to search">
-            </div>
-            <div class="web-search-toggle">
-                <button class="metro-toggle-button" id="web-search-toggle" aria-pressed="false">
-                    <img src="assets/search.png" alt="Web Search">
-                    <span>Web</span>
-                </button>
-            </div>
+        <div id="close-btn" title="Close Application">
+          <img id="close-btn-icon" alt="Close Icon" />
         </div>
+        <div id="cortana-container" class="content-pane">
+          <div id="animation-container">
+            <img id="gif-display" />
+            <div id="content-wrapper">
+              <div id="results-display"></div>
+              <div id="web-link-container">
+                <hr class="divider" />
+                <a href="#" id="web-link">
+                  <img id="web-icon" alt="Web Icon" />
+                  <span>See more results on the web</span>
+                </a>
+              </div>
+            </div>
+          </div>
+          <div id="reminder-container">
+            <img id="reminder-icon" alt="Cortana Icon" />
+            <p class="reminder-title">What do you want to be reminded about?</p>
+            <div class="reminder-form">
+              <label for="reminder-text-input" class="reminder-label-gray"
+                >Remind me to...</label
+              >
+              <input
+                type="text"
+                id="reminder-text-input"
+                placeholder="e.g., take out the trash"
+              />
+              <label for="reminder-time-input" class="reminder-label-gray"
+                >On this date and time</label
+              >
+              <input type="datetime-local" id="reminder-time-input" />
+              <div class="reminder-actions">
+                <button id="reminder-save-btn">Save</button>
+                <button id="reminder-cancel-btn">Cancel</button>
+              </div>
+            </div>
+          </div>
+          <div id="settings-container">
+            <div class="settings-header">
+              <button id="settings-back-btn">&#xE0A6;</button>
+              <h1>Settings</h1>
+            </div>
+            <div class="settings-content">
+              <div class="settings-main-content">
+                <div class="settings-section">
+                  <h2>Personalisation</h2>
+                  <div class="setting-item">
+                    <label for="voice-select">Voice</label>
+                    <select id="voice-select"></select>
+                  </div>
+                  <div class="setting-item">
+                    <label for="pitch-slider">Speech Pitch</label>
+                    <input
+                      type="range"
+                      id="pitch-slider"
+                      min="0.1"
+                      max="2"
+                      step="0.1"
+                      class="speech-slider"
+                    />
+                  </div>
+                  <div class="setting-item">
+                    <label for="rate-slider">Speech Speed</label>
+                    <input
+                      type="range"
+                      id="rate-slider"
+                      min="0.5"
+                      max="2"
+                      step="0.1"
+                      class="speech-slider"
+                    />
+                  </div>
+                  <div class="setting-item">
+                    <label for="theme-color-picker">Theme Colour</label>
+                    <input
+                      type="color"
+                      id="theme-color-picker"
+                      value="#0078d7"
+                    />
+                  </div>
+                  <div class="setting-item">
+                    <label for="idle-greeting-mode-select">Idle Greeting</label>
+                    <select id="idle-greeting-mode-select">
+                      <option value="random">Random</option>
+                      <option value="specific">Specific</option>
+                      <option value="custom">Custom</option>
+                    </select>
+                  </div>
+                  <div
+                    id="specific-greeting-container"
+                    class="setting-sub-item"
+                  >
+                    <div class="setting-item">
+                      <label for="specific-greeting-select">Greeting</label>
+                      <select id="specific-greeting-select"></select>
+                    </div>
+                  </div>
+                  <div id="custom-greeting-container" class="setting-sub-item">
+                    <div class="setting-item">
+                      <label for="custom-greeting-input">Custom Text</label>
+                      <input
+                        type="text"
+                        id="custom-greeting-input"
+                        class="settings-text-input"
+                        placeholder="Hello!"
+                      />
+                    </div>
+                  </div>
+                  <p id="voice-warning" class="setting-warning">
+                    Cortana's default voice (Microsoft Zira Desktop) is not
+                    available.
+                  </p>
+                </div>
+                <div class="settings-section">
+                  <h2>Custom Actions</h2>
+                  <div id="custom-actions-list" class="reminder-list"></div>
+                  <button id="add-custom-action-btn" class="settings-button">
+                    Add New Action
+                  </button>
+                </div>
+                <div class="settings-section">
+                  <h2>Search</h2>
+                  <div class="setting-item">
+                    <label for="search-engine-select">Search Engine</label>
+                    <select id="search-engine-select">
+                      <option value="bing">Bing</option>
+                      <option value="google">Google</option>
+                      <option value="duckduckgo">DuckDuckGo</option>
+                      <option value="brave">Brave</option>
+                      <option value="ecosia">Ecosia</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="settings-section">
+                  <h2>System</h2>
+                  <div class="setting-item">
+                    <label for="startup-toggle">Start with Windows</label>
+                    <label class="toggle-switch">
+                      <input type="checkbox" id="startup-toggle" />
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                  <p id="startup-warning" class="setting-warning">
+                    Reminders may not work as expected until Cortana is launched
+                    manually.
+                  </p>
+                  <div class="setting-item">
+                    <label for="movable-toggle">Movable Window</label>
+                    <label class="toggle-switch">
+                      <input type="checkbox" id="movable-toggle" />
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                  <div class="setting-item">
+                    <label for="instant-response-toggle"
+                      >Instant Response</label
+                    >
+                    <label class="toggle-switch">
+                      <input type="checkbox" id="instant-response-toggle" />
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                </div>
+                <div class="settings-section">
+                  <h2>Advanced</h2>
+                  <button id="reset-voice-btn" class="settings-button">
+                    Reset Voice Settings
+                  </button>
+                  <button id="reset-all-btn" class="settings-button danger">
+                    Reset All Settings & Reminders
+                  </button>
+                </div>
+              </div>
+              <div id="custom-action-form-container">
+                <p class="reminder-title">Custom Action</p>
+                <div class="reminder-form">
+                  <label
+                    for="custom-action-trigger-input"
+                    class="reminder-label-gray"
+                    >When I say...</label
+                  >
+                  <input
+                    type="text"
+                    id="custom-action-trigger-input"
+                    placeholder="e.g., who made you?"
+                  />
+                  <label class="reminder-label-gray" style="margin-top: 15px"
+                    >Cortana will...</label
+                  >
+                  <div id="action-sequence-list"></div>
+                  <button
+                    id="add-action-to-sequence-btn"
+                    class="settings-button"
+                    style="margin-top: 5px"
+                  >
+                    Add Step
+                  </button>
+                  <p id="action-sequence-warning" class="setting-warning"></p>
+                  <div class="reminder-actions">
+                    <button id="custom-action-save-btn">Save</button>
+                    <button id="custom-action-cancel-btn">Cancel</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="search-container">
+        <div class="search-input-wrapper">
+          <img id="search-icon" alt="Cortana Icon" />
+          <input
+            type="text"
+            id="search-bar"
+            placeholder="Type here to search"
+          />
+        </div>
+        <div class="web-search-toggle">
+          <button
+            class="metro-toggle-button"
+            id="web-search-toggle"
+            aria-pressed="false"
+          >
+            <img id="web-search-toggle-icon" alt="Web Search" />
+            <span>Web</span>
+          </button>
+        </div>
+      </div>
     </div>
     <script src="renderer.js"></script>
-</body>
+  </body>
 </html>

@@ -198,6 +198,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('settings-btn-icon').src = settingsIconPng;
     document.getElementById('close-btn-icon').src = closeIconPng;
+    document.getElementById('web-search-toggle-icon').src = searchIconPng;
     searchIcon.src = cortanaIcon;
     reminderIcon.src = idleVideo;
 
@@ -1248,10 +1249,9 @@ function processQuery(query) {
     webLinkContainer.style.display = 'none';
     webLinkContainer.style.opacity = '0';
     gifDisplay.src = speakingVideo;
-    resultsDisplay.innerHTML = '';  // Ensure display is clear before showing new response
+    resultsDisplay.innerHTML = '';
     const lowerCaseQuery = query.toLowerCase();
 
-    // If web search is enabled, directly perform web search
     if (webSearchEnabled) {
         if (navigator.onLine) {
             performWebSearch(query);
@@ -1472,7 +1472,6 @@ function onSearch() {
     searchBar.disabled = true;
     gifDisplay.src = thinkingVideo;
     
-    // Clear the results display while thinking
     resultsDisplay.innerHTML = '';
 
     if (instantResponse) {
