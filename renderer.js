@@ -139,6 +139,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     });
 
     ipcRenderer.on('update-status', (event, { available, currentVersion, remoteVersion }) => {
+
         if (currentVersionSpan) {
             currentVersionSpan.textContent = currentVersion;
         }
@@ -151,6 +152,7 @@ window.addEventListener('DOMContentLoaded', async () => {
                 }
             }
         }
+
     });
     webLinkContainer = document.getElementById('web-link-container');
     webLink = document.getElementById('web-link');

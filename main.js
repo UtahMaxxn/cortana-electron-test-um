@@ -165,6 +165,12 @@ if (!gotTheLock) {
       showWindow();
     }
   });
+
+  const sendAppVersion = async () => {
+    if (mainWindow) {const currentVersion = app.getVersion();
+        mainWindow.webContents.send('update-status', { currentVersion: currentVersion });
+    }
+  };
   app.whenReady().then(async () => {
       const assetsPath = app.isPackaged
           ? path.join(process.resourcesPath, 'assets')
@@ -181,7 +187,7 @@ if (!gotTheLock) {
       createWindow();
       
       // Check for updates in the background
-      await checkForUpdates();
+      sendAppVersion();
   });
 }
 
@@ -547,7 +553,7 @@ function createWindow() {
             }
         });
     });
-  
+
     mainWindow.loadFile('index.html');
     mainWindow.on('ready-to-show', () => {
         if (!isSilentStart) {
