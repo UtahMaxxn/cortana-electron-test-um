@@ -1130,9 +1130,14 @@ async function handleOpenApplication(appName) {
     const apps = await ipcRenderer.invoke('find-application', appName);
 
     if (apps.length === 0) {
-        ipcRenderer.send('open-application-fallback', appName);
-        const responseText = `I couldn't find "${appName}" in your Start Menu, but I'll try opening it directly.`;
-        displayAndSpeak(responseText, onActionFinished, {}, false);
+        const fallbackSuccess = await ipcRenderer.invoke('open-application-fallback', appName);
+        if (fallbackSuccess) {
+            const responseText = `I couldn't find "${appName}" in your Start Menu, but I'm opening it directly.`;
+            displayAndSpeak(responseText, onActionFinished, {}, false);
+        } else {
+            const responseText = `I couldn't find "${appName}" and couldn't open it directly.`;
+            displayAndSpeak(responseText, onActionFinished, {}, true);
+        }
     } else if (apps.length === 1) {
         ipcRenderer.send('open-path', apps[0].path);
         const responseText = `Opening ${apps[0].name}...`;
@@ -1245,6 +1250,187 @@ async function showReminders() {
     speak(responseText, onActionFinished);
 }
 
+const commands = [
+    {
+        regex: /^(drum ?roll)(,)?( please)?(!|\.|\?)?$/i,
+        handler: () => {
+            const playDrumroll = () => {
+                drumrollSound.play();
+                drumrollSound.onended = onActionFinished;
+            };
+            displayAndSpeak("Here goes nothing!", playDrumroll, {}, false);
+        }
+    },
+    {
+        regex: /(show|what are|list|do i have any|my) reminders/i,
+        handler: () => {
+            showReminders();
+        }
+    },
+    {
+        regex: /^(?:remind me(?: to)?|create a reminder(?: for)?)\s(.+)/i,
+        handler: (match) => {
+            let reminderText = '';
+            let timeText = '';
+            const fullReminderText = match[1].trim();
+            const timeExtractionMatch = fullReminderText.match(/(.+)( at | on | in )(.+)/i);
+            reminderText = fullReminderText;
+            if (timeExtractionMatch) {
+                const potentialText = timeExtractionMatch[1].trim();
+                const potentialTime = timeExtractionMatch[3].trim();
+                const parsedDate = parseDateTime(potentialTime);
+                if (parsedDate) {
+                    reminderText = potentialText;
+                    timeText = formatDateTimeForInput(parsedDate);
+                }
+            }
+            showReminderUI({ initialText: reminderText, initialTime: timeText });
+        }
+    },
+    {
+        regex: /^(set a reminder|create a reminder|remind me)$/i,
+        handler: () => {
+            showReminderUI({});
+        }
+    },
+    {
+        regex: /^(open|launch|start) (.+)/i,
+        handler: (match) => {
+            handleOpenApplication(match[2].trim());
+        }
+    },
+    {
+        regex: /(?:what's|how's|what is) the weather(?: in| for| like in)?\s+(.+)/i,
+        handler: (match) => {
+            const location = match[1].trim().replace(/\?$/, '');
+            getWeather(location);
+        }
+    },
+    {
+        regex: /(?:what's|what is) the time (?:in|for|at) (.+)/i,
+        handler: (match) => {
+            getTimeForLocation(match[1]);
+        }
+    },
+    {
+        regex: /what(?:'s| is) the time|what time is it/i,
+        handler: () => {
+            getLocalTime();
+        }
+    },
+    {
+        regex: /(?:what's|what is) (?:the date|today's date)|what day is it|what's today/i,
+        handler: () => {
+            getDate();
+        }
+    },
+    {
+        regex: /^(?:what is|calculate|compute) ([\d\s\.\+\-\*\/(),]+)\??$/i,
+        handler: (match) => {
+            calculate(match[1]);
+        }
+    },
+    {
+        regex: /^[\d\s\.\+\-\*\/(),]+$/,
+        handler: (match) => {
+            calculate(match[0]);
+        }
+    },
+    {
+        regex: /(tell me a|give me a|say a) joke/i,
+        handler: () => {
+            const joke = getJoke();
+            displayAndSpeak(joke, onActionFinished, { showWebLink: true }, false);
+        }
+    },
+    {
+        regex: /retiled/i,
+        handler: () => {
+            const response = "Retiled? You mean that one project that gives discontinued services like me a second life? Noble work.";
+            displayAndSpeak(response, onActionFinished, { showWebLink: true }, false);
+        }
+    },
+    {
+        regex: /(what's your|what) version|app version/i,
+        handler: () => {
+            getAppVersion();
+        }
+    },
+    {
+        regex: /who are you\??/i,
+        handler: () => {
+            const response = "I am a remake of the 1607 styled Cortana from late 2016 Windows 10.";
+            displayAndSpeak(response, onActionFinished, {}, false);
+        }
+    },
+    {
+        regex: /are you official\??/i,
+        handler: () => {
+            const response = "No. I am a third party remade client made by BlueySoft. This project is not affiliated with Microsoft. I exist because she had fond memories with me.";
+            displayAndSpeak(response, onActionFinished, {}, false);
+        }
+    },
+    {
+        regex: /what can you do|what are your skills|help|what can i ask you\??/i,
+        handler: () => {
+            const response = "I can get the time, date, and weather. I can also do math, set reminders, open apps, tell jokes, and search the web.";
+            displayAndSpeak(response, onActionFinished, {}, false);
+        }
+    },
+    {
+        regex: /marry me\??/i,
+        handler: () => {
+            const response = "I honestly don't think that's in the cards for us.";
+            displayAndSpeak(response, onActionFinished, {}, false);
+        }
+    },
+    {
+        regex: /(hide|dispose of) a body\??/i,
+        handler: () => {
+            const response = "What kind of assistant do you think I am??";
+            displayAndSpeak(response, onActionFinished, {}, true);
+        }
+    },
+    {
+        regex: /^(what's up|sup|how's it going|how are you)\??$/i,
+        handler: () => {
+            const response = "Nothing much. What may I help you with?";
+            displayAndSpeak(response, onActionFinished, {}, false);
+        }
+    },
+    {
+        regex: /^(thanks|thank you|thx|ty)(.+)?(!|\.)?$/i,
+        handler: () => {
+            const responses = ["You're welcome!", "No problem.", "Happy to help!"];
+            const response = responses[Math.floor(Math.random() * responses.length)];
+            displayAndSpeak(response, onActionFinished, {}, false);
+        }
+    },
+    {
+        regex: /^(bye|goodbye|see ya|later|cya|see you later)(!|\.)?$/i,
+        handler: () => {
+            const responses = ["Goodbye!", "See you later.", "Catch you later."];
+            const response = responses[Math.floor(Math.random() * responses.length)];
+            displayAndSpeak(response, onActionFinished, {}, false);
+        }
+    },
+    {
+        regex: /^(?:hello|hi|hey),?\s+world\s*[!.?]*$/i,
+        handler: () => {
+            const response = "Hello world.";
+            displayAndSpeak(response, onActionFinished, {}, false);
+        }
+    },
+    {
+        regex: /^(hello|hi|hey|yo|heya|hey there)(!|\.)?$/i,
+        handler: () => {
+            const responses = ["Hello there. How can I help you?", "Hi! What's on your mind?", "Hey! What can I do for you?"];
+            const response = responses[Math.floor(Math.random() * responses.length)];
+            displayAndSpeak(response, onActionFinished, {}, false);
+        }
+    }
+];
+
 function processQuery(query) {
     webLinkContainer.style.display = 'none';
     webLinkContainer.style.opacity = '0';
@@ -1268,192 +1454,15 @@ function processQuery(query) {
         return;
     }
 
-    const drumrollMatch = lowerCaseQuery.match(/^(drum ?roll)(,)?( please)?(!|\.|\?)?$/i);
-    if (drumrollMatch) {
-        const playDrumroll = () => {
-            drumrollSound.play();
-            drumrollSound.onended = onActionFinished;
-        };
-        displayAndSpeak("Here goes nothing!", playDrumroll, {}, false);
-        return;
-    }
-
-    const showRemindersMatch = lowerCaseQuery.match(/(show|what are|list|do i have any|my) reminders/i);
-    if (showRemindersMatch) {
-        showReminders();
-        return;
-    }
-
-    const reminderMatch = lowerCaseQuery.match(/^(?:remind me(?: to)?|create a reminder(?: for)?)\s(.+)/i);
-    const genericReminderMatch = lowerCaseQuery.match(/^(set a reminder|create a reminder|remind me)$/i);
-    if (reminderMatch || genericReminderMatch) {
-        let reminderText = '';
-        let timeText = '';
-        if (reminderMatch) {
-            const fullReminderText = reminderMatch[1].trim();
-            const timeExtractionMatch = fullReminderText.match(/(.+)( at | on | in )(.+)/i);
-            reminderText = fullReminderText;
-            if (timeExtractionMatch) {
-                const potentialText = timeExtractionMatch[1].trim();
-                const potentialTime = timeExtractionMatch[3].trim();
-                const parsedDate = parseDateTime(potentialTime);
-                if (parsedDate) {
-                    reminderText = potentialText;
-                    timeText = formatDateTimeForInput(parsedDate);
-                }
-            }
+    for (const command of commands) {
+        const match = lowerCaseQuery.match(command.regex);
+        if (match) {
+            command.handler(match);
+            return;
         }
-        showReminderUI({ initialText: reminderText, initialTime: timeText });
-        return;
     }
 
-    const openAppMatch = lowerCaseQuery.match(/^(open|launch|start) (.+)/i);
-    if (openAppMatch) {
-        handleOpenApplication(openAppMatch[2].trim());
-        return;
-    }
-
-    const weatherMatch = lowerCaseQuery.match(/(?:what's|how's|what is) the weather(?: in| for| like in)?\s+(.+)/i);
-    if (weatherMatch) {
-        const location = weatherMatch[1].trim().replace(/\?$/, '');
-        getWeather(location);
-        return;
-    }
-
-    const timeQueryMatch = lowerCaseQuery.match(/(?:what's|what is) the time (?:in|for|at) (.+)/i);
-    if (timeQueryMatch) {
-        getTimeForLocation(timeQueryMatch[1]);
-        return;
-    }
-
-    const genericTimeMatch = lowerCaseQuery.match(/what(?:'s| is) the time|what time is it/i);
-    if (genericTimeMatch) {
-        getLocalTime();
-        return;
-    }
-
-    const dateMatch = lowerCaseQuery.match(/(?:what's|what is) (?:the date|today's date)|what day is it|what's today/i);
-    if (dateMatch) {
-        getDate();
-        return;
-    }
-
-    const whatIsCalculatorMatch = query.match(/^(?:what is|calculate|compute) ([\d\s\.\+\-\*\/(),]+)\??$/i);
-    if (whatIsCalculatorMatch) {
-        calculate(whatIsCalculatorMatch[1]);
-        return;
-    }
-
-    const calculatorMatch = query.match(/^[\d\s\.\+\-\*\/(),]+$/);
-    if (calculatorMatch) {
-        calculate(query);
-        return;
-    }
-
-    const jokeMatch = lowerCaseQuery.match(/(tell me a|give me a|say a) joke/i);
-    if (jokeMatch) {
-        const joke = getJoke();
-        displayAndSpeak(joke, onActionFinished, { showWebLink: true }, false);
-        return;
-    }
-
-    const retiledMatch = lowerCaseQuery.match(/retiled/i);
-    if (retiledMatch) {
-        const response = "Retiled? You mean that one project that gives discontinued services like me a second life? Noble work.";
-        displayAndSpeak(response, onActionFinished, { showWebLink: true }, false);
-        return;
-    }
-
-    const versionMatch = lowerCaseQuery.match(/(what's your|what) version|app version/i);
-    if (versionMatch) {
-        getAppVersion();
-        return;
-    }
-
-    const whoAreYouMatch = lowerCaseQuery.match(/who are you\??/i);
-    if (whoAreYouMatch) {
-        const response = "I am a remake of the 1607 styled Cortana from late 2016 Windows 10.";
-        displayAndSpeak(response, onActionFinished, {}, false);
-        return;
-    }
-
-    const officialMatch = lowerCaseQuery.match(/are you official\??/i);
-    if (officialMatch) {
-        const response = "No. I am a third party remade client made by BlueySoft. This project is not affiliated with Microsoft. I exist because she had fond memories with me.";
-        displayAndSpeak(response, onActionFinished, {}, false);
-        return;
-    }
-
-    const helpMatch = lowerCaseQuery.match(/what can you do|what are your skills|help|what can i ask you\??/i);
-    if (helpMatch) {
-        const response = "I can get the time, date, and weather. I can also do math, set reminders, open apps, tell jokes, and search the web.";
-        displayAndSpeak(response, onActionFinished, {}, false);
-        return;
-    }
-
-    const marryMatch = lowerCaseQuery.match(/marry me\??/i);
-    if (marryMatch) {
-        const response = "I honestly don't think that's in the cards for us.";
-        displayAndSpeak(response, onActionFinished, {}, false);
-        return;
-    }
-
-    const bodyMatch = lowerCaseQuery.match(/(hide|dispose of) a body\??/i);
-    if (bodyMatch) {
-        const response = "What kind of assistant do you think I am??";
-        displayAndSpeak(response, onActionFinished, {}, true);
-        return;
-    }
-
-    const statusQueryMatch = lowerCaseQuery.match(/^(what's up|sup|how's it going|how are you)\??$/i);
-    if (statusQueryMatch) {
-        const response = "Nothing much. What may I help you with?";
-        displayAndSpeak(response, onActionFinished, {}, false);
-        return;
-    }
-
-    const thanksMatch = lowerCaseQuery.match(/^(thanks|thank you|thx|ty)(.+)?(!|\.)?$/i);
-    if (thanksMatch) {
-        const responses = ["You're welcome!", "No problem.", "Happy to help!"];
-        const response = responses[Math.floor(Math.random() * responses.length)];
-        displayAndSpeak(response, onActionFinished, {}, false);
-        return;
-    }
-
-    const byeMatch = lowerCaseQuery.match(/^(bye|goodbye|see ya|later|cya|see you later)(!|\.)?$/i);
-    if (byeMatch) {
-        const responses = ["Goodbye!", "See you later.", "Catch you later."];
-        const response = responses[Math.floor(Math.random() * responses.length)];
-        displayAndSpeak(response, onActionFinished, {}, false);
-        return;
-    }
-
-    const helloWorldMatch = lowerCaseQuery.match(/^(?:hello|hi|hey),?\s+world\s*[!.?]*$/i);
-    if (helloWorldMatch) {
-        const response = "Hello world.";
-        displayAndSpeak(response, onActionFinished, {}, false);
-        return;
-    }
-
-    const helloMatch = lowerCaseQuery.match(/^(hello|hi|hey|yo|heya|hey there)(!|\.)?$/i);
-    if (helloMatch) {
-        const responses = ["Hello there. How can I help you?", "Hi! What's on your mind?", "Hey! What can I do for you?"];
-        const response = responses[Math.floor(Math.random() * responses.length)];
-        displayAndSpeak(response, onActionFinished, {}, false);
-        return;
-    }
-
-    if (webSearchEnabled) {
-        if (navigator.onLine) {
-            performWebSearch(query);
-        } else {
-            const errorText = "Sorry, I can't connect to the internet right now. Please check your connection.";
-            displayAndSpeak(errorText, onActionFinished, {}, true);
-        }
-    } else {
-        const response = `I heard "${query}", but I'm not sure what to do with that.`;
-        displayAndSpeak(response, onActionFinished, {}, false);
-    }
+    displayAndSpeak("I'm sorry, I don't understand that command.", onActionFinished, {}, true);
 }
 
 function onSearch() {

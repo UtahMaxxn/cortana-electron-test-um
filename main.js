@@ -29,6 +29,8 @@ let isSettingsVisible = false;
 let tray = null;
 let isClosing = false;
 
+let applicationCache = new Map();
+
 let reminders = [];
 
 let settings = {
@@ -207,6 +209,7 @@ if (!gotTheLock) {
 
     await loadSettings();
     await loadReminders();
+    await scanApplications(); // Call scanApplications here
 
     app.setLoginItemSettings({
       openAtLogin: settings.openAtLogin,
@@ -256,6 +259,39 @@ async function findApplicationsIn(folder) {
     console.error(`Failed to read application folder: ${folder}`, err);
   }
   return results;
+}
+
+async function scanApplications() {
+  applicationCache.clear();
+  const startMenuFolders = [
+    path.join(
+      "C:",
+      "ProgramData",
+      "Microsoft",
+      "Windows",
+      "Start Menu",
+      "Programs"
+    ),
+    app.getPath("appData")
+      ? path.join(
+          app.getPath("appData"),
+          "Microsoft",
+          "Windows",
+          "Start Menu",
+          "Programs"
+        )
+      : null,
+  ].filter(Boolean);
+
+  for (const folder of startMenuFolders) {
+    const appsInFolder = await findApplicationsIn(folder);
+    for (const app of appsInFolder) {
+      if (!applicationCache.has(app.name)) {
+        applicationCache.set(app.name, app.path);
+      }
+    }
+  }
+  console.log(`Scanned and cached ${applicationCache.size} applications.`);
 }
 
 function createWindow() {
@@ -422,39 +458,9 @@ function createWindow() {
 
   ipcMain.handle("find-application", async (event, query) => {
     const queryLower = query.toLowerCase();
-    const allApps = new Map();
-
-    const startMenuFolders = [
-      path.join(
-        "C:",
-        "ProgramData",
-        "Microsoft",
-        "Windows",
-        "Start Menu",
-        "Programs"
-      ),
-      app.getPath("appData")
-        ? path.join(
-            app.getPath("appData"),
-            "Microsoft",
-            "Windows",
-            "Start Menu",
-            "Programs"
-          )
-        : null,
-    ].filter(Boolean);
-
-    for (const folder of startMenuFolders) {
-      const appsInFolder = await findApplicationsIn(folder);
-      for (const app of appsInFolder) {
-        if (!allApps.has(app.name)) {
-          allApps.set(app.name, app.path);
-        }
-      }
-    }
-
     const matchingApps = [];
-    for (const [name, path] of allApps.entries()) {
+
+    for (const [name, path] of applicationCache.entries()) {
       if (name.toLowerCase().includes(queryLower)) {
         matchingApps.push({ name, path });
       }
@@ -462,15 +468,20 @@ function createWindow() {
     return matchingApps;
   });
 
-  ipcMain.on("open-application-fallback", (event, appName) => {
+  ipcMain.handle("open-application-fallback", async (event, appName) => {
     const sanitizedAppName = appName.replace(/"/g, "");
-    exec(`start "" "${sanitizedAppName}"`, (error) => {
-      if (error) {
-        console.error(`Fallback failed to open app ${appName}:`, error);
-        mainWindow.webContents.send("command-failed", {
-          command: "open-application",
-        });
-      }
+    return new Promise((resolve) => {
+      exec(`start "" "${sanitizedAppName}"`, (error) => {
+        if (error) {
+          console.error(`Fallback failed to open app ${appName}:`, error);
+          mainWindow.webContents.send("command-failed", {
+            command: "open-application",
+          });
+          resolve(false);
+        } else {
+          resolve(true);
+        }
+      });
     });
   });
 
