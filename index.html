@@ -134,6 +134,16 @@
                                 </div>
                             </div>
                             <div class="settings-section">
+                                <h2>Updates</h2>
+                                <div class="setting-item">
+                                    <div id="update-status">Current Version: <span id="current-version"></span></div>
+                                </div>
+                                <div id="update-available" style="display: none;">
+                                    <p class="update-message">A new version is available!</p>
+                                    <button id="update-button" class="settings-button">Download Update</button>
+                                </div>
+                            </div>
+                            <div class="settings-section">
                                 <h2>Advanced</h2>
                                 <button id="reset-voice-btn" class="settings-button">Reset Voice Settings</button>
                                 <button id="reset-all-btn" class="settings-button danger">Reset All Settings & Reminders</button>
@@ -159,8 +169,16 @@
             </div>
         </div>
         <div class="search-container">
-            <img id="search-icon" alt="Cortana Icon">
-            <input type="text" id="search-bar" placeholder="Type here to search">
+            <div class="search-input-wrapper">
+                <img id="search-icon" alt="Cortana Icon">
+                <input type="text" id="search-bar" placeholder="Type here to search">
+            </div>
+            <div class="web-search-toggle">
+                <button class="metro-toggle-button" id="web-search-toggle" aria-pressed="false">
+                    <img src="assets/search.png" alt="Web Search">
+                    <span>Web</span>
+                </button>
+            </div>
         </div>
     </div>
     <script src="renderer.js"></script>

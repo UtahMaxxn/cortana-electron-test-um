@@ -1,7 +1,7 @@
 const { ipcRenderer } = require('electron');
 const path = require('path');
 
-let searchBar, searchIcon;
+let searchBar, searchIcon, webSearchToggle;
 let animationContainer, gifDisplay, resultsDisplay, contentWrapper;
 let webLinkContainer, webLink, webIcon;
 let appContainer;
@@ -25,6 +25,7 @@ let isMovableMode = false;
 let themeColor = "#0078d7";
 let pitch = 1;
 let rate = 1;
+let webSearchEnabled = false;
 let idleGreetingMode = 'random';
 let specificIdleGreeting = "What's on your mind?";
 let customIdleGreeting = '';
@@ -123,10 +124,34 @@ window.addEventListener('DOMContentLoaded', async () => {
     appContainer = document.getElementById('app-container');
     searchBar = document.getElementById('search-bar');
     searchIcon = document.getElementById('search-icon');
+    webSearchToggle = document.getElementById('web-search-toggle');
     animationContainer = document.getElementById('animation-container');
     gifDisplay = document.getElementById('gif-display');
     resultsDisplay = document.getElementById('results-display');
     contentWrapper = document.getElementById('content-wrapper');
+    
+    const updateAvailableDiv = document.getElementById('update-available');
+    const updateButton = document.getElementById('update-button');
+    const currentVersionSpan = document.getElementById('current-version');
+
+    updateButton?.addEventListener('click', () => {
+        ipcRenderer.send('open-github-releases');
+    });
+
+    ipcRenderer.on('update-status', (event, { available, currentVersion, remoteVersion }) => {
+        if (currentVersionSpan) {
+            currentVersionSpan.textContent = currentVersion;
+        }
+        if (updateAvailableDiv) {
+            updateAvailableDiv.style.display = available ? 'block' : 'none';
+            if (available) {
+                const updateMessage = updateAvailableDiv.querySelector('.update-message');
+                if (updateMessage) {
+                    updateMessage.textContent = `A new version (${remoteVersion}) is available!`;
+                }
+            }
+        }
+    });
     webLinkContainer = document.getElementById('web-link-container');
     webLink = document.getElementById('web-link');
     webIcon = document.getElementById('web-icon');
@@ -179,6 +204,17 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('close-btn').addEventListener('click', () => ipcRenderer.send('close-app'));
     searchBar.addEventListener('keydown', (event) => { if (event.key === 'Enter') onSearch(); });
+    
+    webSearchToggle.addEventListener('click', (e) => {
+        e.preventDefault();
+        webSearchEnabled = !webSearchEnabled;
+        webSearchToggle.classList.toggle('active', webSearchEnabled);
+        webSearchToggle.setAttribute('aria-pressed', webSearchEnabled);
+        searchIcon.src = webSearchEnabled ? searchIconPng : cortanaIcon;
+        ipcRenderer.send('set-setting', { key: 'webSearchEnabled', value: webSearchEnabled });
+        searchBar.focus();
+    });
+
     searchBar.addEventListener('focus', () => {
         if (animationContainer.className === 'active') {
             setStateIdle();
@@ -186,9 +222,10 @@ window.addEventListener('DOMContentLoaded', async () => {
         }
         gifDisplay.src = listeningVideo;
         onSound.play();
-        searchIcon.src = searchIconPng;
+        searchIcon.src = webSearchEnabled ? searchIconPng : cortanaIcon;
     });
-    searchBar.addEventListener('blur', () => {
+    
+    searchBar.addEventListener('blur', (e) => {
         if (animationContainer.className === 'idle') {
             gifDisplay.src = idleVideo;
         }
@@ -232,6 +269,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     instantResponseToggle.addEventListener('change', onInstantResponseToggleChanged);
     themeColorPicker.addEventListener('input', onThemeColorChanged, false);
     movableToggle.addEventListener('change', onMovableToggleChanged);
+    webSearchToggle.addEventListener('change', onWebSearchToggleChanged);
     pitchSlider.addEventListener('input', onPitchChanged);
     rateSlider.addEventListener('input', onRateChanged);
     resetVoiceBtn.addEventListener('click', onResetVoiceSettings);
@@ -394,6 +432,10 @@ async function loadAndApplySettings() {
     pitchSlider.value = pitch;
     rate = settings.rate || 1;
     rateSlider.value = rate;
+
+    webSearchEnabled = settings.webSearchEnabled === true;
+    webSearchToggle.classList.toggle('active', webSearchEnabled);
+    webSearchToggle.setAttribute('aria-pressed', webSearchEnabled);
 
     idleGreetingMode = settings.idleGreetingMode || 'random';
     specificIdleGreeting = settings.specificIdleGreeting || "What's on your mind?";
@@ -580,6 +622,12 @@ function onInstantResponseToggleChanged() {
     ipcRenderer.send('set-setting', { key: 'instantResponse', value: instantResponse });
 }
 
+function onWebSearchToggleChanged() {
+    webSearchEnabled = !webSearchEnabled;
+    webSearchToggle.classList.toggle('active', webSearchEnabled);
+    ipcRenderer.send('set-setting', { key: 'webSearchEnabled', value: webSearchEnabled });
+}
+
 function onIdleGreetingModeChanged(event) {
     idleGreetingMode = event.target.value;
     ipcRenderer.send('set-setting', { key: 'idleGreetingMode', value: idleGreetingMode });
@@ -693,7 +741,13 @@ function onActionFinished() {
 
     finishSpeakingTimeout = setTimeout(() => {
         if (animationContainer.className === 'active') {
-            gifDisplay.src = idleVideo;
+            if (document.activeElement === searchBar) {
+                gifDisplay.src = listeningVideo;
+                searchIcon.src = webSearchEnabled ? searchIconPng : cortanaIcon;
+            } else {
+                gifDisplay.src = idleVideo;
+                searchIcon.src = cortanaIcon;
+            }
         }
     }, 1000);
 }
@@ -719,18 +773,22 @@ function setStateIdle() {
 
     isBusy = false;
 
-    if (searchIcon) searchIcon.src = cortanaIcon;
     animationContainer.className = 'idle';
-    gifDisplay.src = idleVideo;
-    if(document.activeElement === searchBar) {
+    if (document.activeElement === searchBar) {
+        searchIcon.src = webSearchEnabled ? searchIconPng : cortanaIcon;
         gifDisplay.src = listeningVideo;
+    } else {
+        searchIcon.src = cortanaIcon;
+        gifDisplay.src = idleVideo;
     }
 
-    resultsDisplay.innerHTML = '';
-    const p = document.createElement('p');
-    p.className = 'fade-in-item';
-    p.textContent = getIdleMessage();
-    resultsDisplay.appendChild(p);
+    if (!isBusy) {
+        resultsDisplay.innerHTML = '';
+        const p = document.createElement('p');
+        p.className = 'fade-in-item';
+        p.textContent = getIdleMessage();
+        resultsDisplay.appendChild(p);
+    }
     
     webLinkContainer.style.display = 'none';
     webLinkContainer.style.opacity = '0';
@@ -1187,7 +1245,19 @@ function processQuery(query) {
     webLinkContainer.style.display = 'none';
     webLinkContainer.style.opacity = '0';
     gifDisplay.src = speakingVideo;
+    resultsDisplay.innerHTML = '';  // Ensure display is clear before showing new response
     const lowerCaseQuery = query.toLowerCase();
+
+    // If web search is enabled, directly perform web search
+    if (webSearchEnabled) {
+        if (navigator.onLine) {
+            performWebSearch(query);
+        } else {
+            const errorText = "Sorry, I can't connect to the internet right now. Please check your connection.";
+            displayAndSpeak(errorText, onActionFinished, {}, true);
+        }
+        return;
+    }
 
     const customAction = customActions.find(a => a.trigger && lowerCaseQuery.includes(a.trigger.toLowerCase()));
     if (customAction && customAction.actions.length > 0) {
@@ -1355,6 +1425,13 @@ function processQuery(query) {
         return;
     }
 
+    const helloWorldMatch = lowerCaseQuery.match(/^(?:hello|hi|hey),?\s+world\s*[!.?]*$/i);
+    if (helloWorldMatch) {
+        const response = "Hello world.";
+        displayAndSpeak(response, onActionFinished, {}, false);
+        return;
+    }
+
     const helloMatch = lowerCaseQuery.match(/^(hello|hi|hey|yo|heya|hey there)(!|\.)?$/i);
     if (helloMatch) {
         const responses = ["Hello there. How can I help you?", "Hi! What's on your mind?", "Hey! What can I do for you?"];
@@ -1363,11 +1440,16 @@ function processQuery(query) {
         return;
     }
 
-    if (navigator.onLine) {
-        performWebSearch(query);
+    if (webSearchEnabled) {
+        if (navigator.onLine) {
+            performWebSearch(query);
+        } else {
+            const errorText = "Sorry, I can't connect to the internet right now. Please check your connection.";
+            displayAndSpeak(errorText, onActionFinished, {}, true);
+        }
     } else {
-        const errorText = "Sorry, I can't connect to the internet right now. Please check your connection.";
-        displayAndSpeak(errorText, onActionFinished, {}, true);
+        const response = `I heard "${query}", but I'm not sure what to do with that.`;
+        displayAndSpeak(response, onActionFinished, {}, false);
     }
 }
 
@@ -1386,6 +1468,9 @@ function onSearch() {
     searchBar.placeholder = 'Thinking...';
     searchBar.disabled = true;
     gifDisplay.src = thinkingVideo;
+    
+    // Clear the results display while thinking
+    resultsDisplay.innerHTML = '';
 
     if (instantResponse) {
         processQuery(query);
@@ -1493,7 +1578,7 @@ function createActionItemUI(action, index, isLastItem) {
     typeSelect.className = 'action-item-type-select';
     const types = {
         'speak': 'Speak Text',
-        'open_app': 'Open App/File',
+        'open_app': 'Open App',
         'open_url': 'Open URL',
         'play_sound': 'Play Sound',
         'run_command': 'Run Command'

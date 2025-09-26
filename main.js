@@ -5,6 +5,9 @@ const { exec } = require('child_process');
 const fs = require('fs/promises');
 const cityTimezones = require('city-timezones');
 
+let updateAvailable = false;
+const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/SoftBluey/Cortana-Electron/refs/heads/main/package.json';
+
 const APP_ID = 'com.blueysoft.cortana-electron';
 app.setAppUserModelId(APP_ID);
 
@@ -96,6 +99,56 @@ async function loadSettings() {
     }
 }
 
+function compareVersions(v1, v2) {
+    const v1Parts = v1.split('.').map(Number);
+    const v2Parts = v2.split('.').map(Number);
+    
+    for (let i = 0; i < Math.max(v1Parts.length, v2Parts.length); i++) {
+        const v1Part = v1Parts[i] || 0;
+        const v2Part = v2Parts[i] || 0;
+        if (v1Part > v2Part) return 1;
+        if (v1Part < v2Part) return -1;
+    }
+    return 0;
+}
+
+async function checkForUpdates() {
+    try {
+        const currentVersion = app.getVersion();
+        
+        const response = await new Promise((resolve, reject) => {
+            https.get(GITHUB_RAW_URL, res => {
+                if (res.statusCode !== 200) {
+                    reject(new Error(`Request failed with status ${res.statusCode}`));
+                    return;
+                }
+
+                let data = '';
+                res.on('data', chunk => data += chunk);
+                res.on('end', () => resolve(data));
+            }).on('error', reject);
+        });
+
+        const remotePackage = JSON.parse(response);
+        const remoteVersion = remotePackage.version;
+
+        updateAvailable = compareVersions(currentVersion, remoteVersion) < 0;
+        
+        if (mainWindow) {
+            mainWindow.webContents.send('update-status', {
+                available: updateAvailable,
+                currentVersion,
+                remoteVersion
+            });
+        }
+
+        return { available: updateAvailable, currentVersion, remoteVersion };
+    } catch (error) {
+        console.error('Failed to check for updates:', error);
+        return { available: false, error: error.message };
+    }
+}
+
 async function saveSettings() {
     try {
         await fs.writeFile(SETTINGS_FILE, JSON.stringify(settings, null, 2));
@@ -126,6 +179,9 @@ if (!gotTheLock) {
           args: ['--hidden']
       });
       createWindow();
+      
+      // Check for updates in the background
+      await checkForUpdates();
   });
 }
 
@@ -425,6 +481,14 @@ function createWindow() {
 
     ipcMain.handle('get-app-version', () => {
         return app.getVersion();
+    });
+
+    ipcMain.handle('check-for-updates', async () => {
+        return await checkForUpdates();
+    });
+
+    ipcMain.on('open-github-releases', () => {
+        shell.openExternal('https://github.com/SoftBluey/Cortana-Electron/releases');
     });
 
     ipcMain.on('set-settings-visibility', (event, visible) => {
