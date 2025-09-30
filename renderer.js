@@ -10,7 +10,7 @@ let editingReminderId = null;
 
 let reminderContainer, reminderTextInput, reminderTimeInput, reminderSaveBtn, reminderCancelBtn, reminderIcon;
 
-let settingsContainer, settingsBtn, settingsBackBtn, voiceSelect, startupToggle, startupWarning, voiceWarning, searchEngineSelect, instantResponseToggle, themeColorPicker, movableToggle, pitchSlider, rateSlider, resetVoiceBtn, resetAllBtn;
+let settingsContainer, settingsBtn, settingsBackBtn, voiceSelect, startupToggle, startupWarning, voiceWarning, searchEngineSelect, instantResponseToggle, themeColorPicker, movableToggle, pitchSlider, rateSlider, resetVoiceBtn, resetAllBtn, apiKeyInput, providerAddressInput;
 let idleGreetingModeSelect, specificGreetingContainer, specificGreetingSelect, customGreetingContainer, customGreetingInput;
 let customActionFormContainer, customActionTriggerInput, customActionSaveBtn, customActionCancelBtn, customActionsList, addCustomActionBtn, actionSequenceList, actionSequenceWarning;
 
@@ -29,6 +29,8 @@ let webSearchEnabled = false;
 let idleGreetingMode = 'random';
 let specificIdleGreeting = "What's on your mind?";
 let customIdleGreeting = '';
+let apiKey = '';
+let providerAddress = '';
 
 
 const appRoot = path.resolve(__dirname, __dirname.includes('app.asar') ? '../assets' : 'assets');
@@ -180,6 +182,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     rateSlider = document.getElementById('rate-slider');
     resetVoiceBtn = document.getElementById('reset-voice-btn');
     resetAllBtn = document.getElementById('reset-all-btn');
+    apiKeyInput = document.getElementById('api-key-input');
+    providerAddressInput = document.getElementById('provider-address-input');
 
     idleGreetingModeSelect = document.getElementById('idle-greeting-mode-select');
     specificGreetingContainer = document.getElementById('specific-greeting-container');
@@ -277,6 +281,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     rateSlider.addEventListener('input', onRateChanged);
     resetVoiceBtn.addEventListener('click', onResetVoiceSettings);
     resetAllBtn.addEventListener('click', onResetAllSettings);
+    apiKeyInput.addEventListener('input', onApiKeyChanged);
+    providerAddressInput.addEventListener('input', onProviderAddressChanged);
     
     idleGreetingModeSelect.addEventListener('change', onIdleGreetingModeChanged);
     specificGreetingSelect.addEventListener('change', onSpecificIdleGreetingChanged);
@@ -450,6 +456,11 @@ async function loadAndApplySettings() {
 
     customActions = settings.customActions || [];
     renderCustomActions();
+
+    apiKey = settings.apiKey || '';
+    apiKeyInput.value = apiKey;
+    providerAddress = settings.providerAddress || '';
+    providerAddressInput.value = providerAddress;
 }
 
 function renderCustomActions() {
@@ -645,6 +656,16 @@ function onSpecificIdleGreetingChanged(event) {
 function onCustomIdleGreetingChanged(event) {
     customIdleGreeting = event.target.value;
     ipcRenderer.send('set-setting', { key: 'customIdleGreeting', value: customIdleGreeting });
+}
+
+function onApiKeyChanged(event) {
+    apiKey = event.target.value;
+    ipcRenderer.send('set-setting', { key: 'apiKey', value: apiKey });
+}
+
+function onProviderAddressChanged(event) {
+    providerAddress = event.target.value;
+    ipcRenderer.send('set-setting', { key: 'providerAddress', value: providerAddress });
 }
 
 function displayAndSpeak(text, callback, options = {}, isError = false) {
@@ -898,21 +919,20 @@ async function getWeather(location) {
         }
 
         const { name, admin1, country, latitude, longitude } = geoData.results[0];
+        
+        const weatherResponse = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`);
+        if (!weatherResponse.ok) {
+            responseText = `Sorry, I had trouble connecting to the weather service.`;
+            displayAndSpeak(responseText, onActionFinished, { showWebLink: true }, true);
+            return;
+        }
+
+        const weatherData = await weatherResponse.json();
+        const { temperature, weathercode } = weatherData.current_weather;
         const locationNameForSpeech = (admin1 && admin1.toLowerCase() !== name.toLowerCase()) ? `${name}, ${admin1}` : `${name}, ${country}`;
-        const locationForUrl = admin1 ? `${name},${admin1}` : name;
-        const weatherUrl = `https://www.msn.com/en-us/weather/forecast/in-${locationForUrl}?lat=${latitude}&lon=${longitude}&ocid=ansmsnweather`;
 
-        lastQuery = `weather in ${location}`;
-        responseText = `Here's the weather from MSN for ${locationNameForSpeech}.`;
-
-        displayAndSpeak(responseText, () => {
-            ipcRenderer.send('open-external-link', weatherUrl);
-            if (!isMovableMode) {
-                ipcRenderer.send('close-app');
-            } else {
-                onActionFinished();
-            }
-        }, {}, false);
+        responseText = `The current temperature in ${locationNameForSpeech} is ${temperature}°C.`;
+        displayAndSpeak(responseText, onActionFinished, { showWebLink: true }, false);
 
     } catch (error) {
         responseText = `Sorry, an unexpected error occurred while getting the weather.`;
@@ -923,36 +943,19 @@ async function getWeather(location) {
 async function getTimeForLocation(rawInput) {
     let text;
     try {
-        const result = await ipcRenderer.invoke('get-time-for-location', rawInput.trim());
-
-        if (result.ambiguous) {
-            text = "I found a few places with that name. Which one did you mean?";
-            
-            resultsDisplay.innerHTML = '';
-            const p = document.createElement('p');
-            p.className = 'fade-in-item';
-            p.style.marginBottom = '10px';
-            p.textContent = text;
-            resultsDisplay.appendChild(p);
-
-            result.options.forEach((option, index) => {
-                const btn = document.createElement('button');
-                btn.textContent = `${option.city}, ${option.region}`;
-                btn.className = 'choice-button fade-in-item';
-                btn.style.animationDelay = `${index * 100}ms`;
-                btn.onclick = () => {
-                    processQuery(`what is the time in ${option.fullQuery}`);
-                };
-                resultsDisplay.appendChild(btn);
-            });
-
-            speak(text, onActionFinished);
-            showWebLink();
-
-        } else {
-            text = `The time in ${result.city}, ${result.country} is ${result.time}.`;
-            displayAndSpeak(text, onActionFinished, { showWebLink: true }, false);
+        const matches = cityTimezones.lookupViaCity(rawInput.trim());
+        if (!matches || matches.length === 0) {
+            text = `Sorry, I couldn't find the time for '${rawInput.trim()}'. Please try a more specific city name.`;
+            displayAndSpeak(text, onActionFinished, { showWebLink: true }, true);
+            return;
         }
+
+        const { city, country, timezone } = matches[0];
+        const now = new Date();
+        const time = now.toLocaleTimeString('en-US', { timeZone: timezone, hour: '2-digit', minute: '2-digit' });
+
+        text = `The time in ${city}, ${country} is ${time}.`;
+        displayAndSpeak(text, onActionFinished, { showWebLink: true }, false);
 
     } catch (error) {
         text = `Sorry, I couldn't find the time for '${rawInput.trim()}'. Please try a more specific city name.`;
@@ -1431,7 +1434,7 @@ const commands = [
     }
 ];
 
-function processQuery(query) {
+async function processQuery(query) {
     webLinkContainer.style.display = 'none';
     webLinkContainer.style.opacity = '0';
     gifDisplay.src = speakingVideo;
@@ -1462,8 +1465,18 @@ function processQuery(query) {
         }
     }
 
-    displayAndSpeak("I'm sorry, I don't understand that command.", onActionFinished, {}, true);
+    if (apiKey && providerAddress) {
+        const response = await ipcRenderer.invoke('get-ai-response', { query, apiKey, providerAddress });
+        if (response.reply) {
+            displayAndSpeak(response.reply, onActionFinished, {}, false);
+        } else {
+            displayAndSpeak(response.error || "I'm sorry, I had trouble getting a response.", onActionFinished, {}, true);
+        }
+    } else {
+        displayAndSpeak("I'm sorry, I don't understand that command.", onActionFinished, {}, true);
+    }
 }
+
 
 function onSearch() {
     if (isBusy) return;
