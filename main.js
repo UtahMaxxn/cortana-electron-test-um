@@ -47,6 +47,8 @@ let settings = {
   specificIdleGreeting: "What's on your mind?",
   customIdleGreeting: "",
   webSearchEnabled: false,
+  apiKey: "",
+  providerAddress: "",
 };
 const SETTINGS_FILE = path.join(app.getPath("userData"), "settings.json");
 const REMINDERS_FILE = path.join(app.getPath("userData"), "reminders.json");
@@ -579,6 +581,63 @@ function createWindow() {
   ipcMain.on("set-settings-visibility", (event, visible) => {
     isSettingsVisible = visible;
   });
+
+    ipcMain.handle('get-ai-response', async (event, { query, apiKey, providerAddress }) => {
+        if (!apiKey || !providerAddress) {
+            return { error: 'API key or provider address is not set.' };
+        }
+
+        const postData = JSON.stringify({
+            model: 'gpt-3.5-turbo', // Or any other model you want to use
+            messages: [{ role: 'user', content: query }],
+        });
+
+        const options = {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+            },
+        };
+
+        try {
+            const url = new URL(providerAddress);
+            options.hostname = url.hostname;
+            options.port = url.port;
+            options.path = url.pathname;
+        } catch (error) {
+            return { error: 'Invalid provider address.' };
+        }
+
+
+        return new Promise((resolve) => {
+            const req = https.request(options, (res) => {
+                let data = '';
+                res.on('data', (chunk) => {
+                    data += chunk;
+                });
+                res.on('end', () => {
+                    try {
+                        const response = JSON.parse(data);
+                        if (response.choices && response.choices.length > 0) {
+                            resolve({ reply: response.choices[0].message.content });
+                        } else {
+                            resolve({ error: 'Failed to get a response from the AI provider.' });
+                        }
+                    } catch (error) {
+                        resolve({ error: 'Failed to parse the response from the AI provider.' });
+                    }
+                });
+            });
+
+            req.on('error', (error) => {
+                resolve({ error: `Request to AI provider failed: ${error.message}` });
+            });
+
+            req.write(postData);
+            req.end();
+        });
+    });
 
   ipcMain.handle("get-time-for-location", async (event, cityInput) => {
     return new Promise((resolve, reject) => {
